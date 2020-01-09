@@ -1,3 +1,4 @@
-# ELS - Enterprise Linux/EuroLinux Sources - device-mapper-persistent-data 
+# ELS - Enterprise Linux/EuroLinux Sources - device-mapper-persistent-data
+ 
 ## Usage:
-  Checkout branch or tag.
+  Checkout branch or tag. Use `make sources` to recreate  SOURCE0 archive.

@@ -1,0 +1,116 @@
+--- thin-provisioning-tools-0.4.1/man8/era_restore.8.orig	2014-10-28 14:24:43.356272471 +0100
++++ thin-provisioning-tools-0.4.1/man8/era_restore.8	2014-10-28 14:28:56.358133852 +0100
+@@ -0,0 +1,63 @@
++.TH ERA_RESTORE 8 "Thin Provisioning Tools" "Red Hat, Inc." \" -*- nroff -*-
++.SH NAME
++era_restore \- restore era metadata file to device or file
++
++.SH SYNOPSIS
++.B era_restore
++.RB [ options ]
++.RB -i
++.I {device|file}
++.RB -o
++.I {device|file}
++
++.SH DESCRIPTION
++.B era_restore
++restores binary era metadata created by the
++respective device-mapper target dumped into an XML formatted (see
++.BR era_dump(8) )
++.I file
++, which optionally can be preprocessed before the restore to another
++.I device
++or
++.I file.
++If restored to a metadata
++.I device
++, the metadata can be processed by the device-mapper target.
++
++.IP "\fB\-q, \-\-quiet\fP"
++Suppress output messages, return only exit code.
++
++.IP "\fB\-i, \-\-input\fP \fI{device|file}\fP"
++Input file or device with metadata.
++
++.IP "\fB\-o, \-\-output\fP \fI{device|file}\fP"
++Output file or device.
++
++.IP "\fB\-h, \-\-help\fP"
++Print help and exit.
++
++.IP "\fB\-V, \-\-version\fP"
++Output version information and exit.
++
++.SH EXAMPLE
++Restores the XML formatted era metadata on file
++.B metadata
++to logical volume /dev/vg/metadata for further processing by the
++respective device-mapper target:
++.sp
++.B era_restore -i metadata -o /dev/vg/metadata
++
++.SH DIAGNOSTICS
++.B era_restore
++returns an exit code of 0 for success or 1 for error.
++
++.SH SEE ALSO
++.B era_check(8)
++.B era_dump(8)
++.B era_invaidate(8)
++.B era_restore(8)
++
++.SH AUTHOR
++Joe Thornber <ejt@redhat.com>
++.br
++Heinz Mauelshagen <HeinzM@RedHat.com>
+--- thin-provisioning-tools-0.4.1/man8/cache_metadata_size.8.orig	2014-10-28 14:31:49.116087709 +0100
++++ thin-provisioning-tools-0.4.1/man8/cache_metadata_size.8	2014-10-28 14:50:29.337238755 +0100
+@@ -0,0 +1,47 @@
++.TH CACHE_METADATA_SIZE 8 "Thin Provisioning Tools" "Red Hat, Inc." \" -*- nroff -*-
++.SH NAME
++cache_metadata_size \- cache metadata device/file size calculator.
++
++.SH SYNOPSIS
++.B cache_metadata_size
++.RB [ options ]
++
++.SH DESCRIPTION
++.B cache_metadata_size
++calculates the size of the cache metadata based on the block size
++of the cache device and the cache block size.
++All relates to the size of the fast device (eg, SSD), rather
++than the whole cached (i.e. origin) device.
++
++.IP "\fB\\-\-block\-size <sectors>\fP
++Block size of cache in units of sectors.
++
++.IP "\fB\\-\-device\-size <sectors>\fP
++Device size of the cache device in units of sectors.
++
++.IP "\fB\\-\-nr\-blocks <natural>\fP
++Capacity of the cache in number of blocks.
++
++.IP "\fB\-h, \-\-help\fP"
++Print help and exit.
++
++.IP "\fB\-V, \-\-version\fP"
++Output version information and exit.
++
++.SH EXAMPLES
++Calculates the cache metadata device size for block size 256 sectors.and device size of 2GiB
++.sp
++.B cache_metadata_size --block-size 256 --device-size $((2*1024*1024))
++
++.SH DIAGNOSTICS
++.B cache_metadata_size
++returns an exit code of 0 for success or 1 for error.
++
++.SH SEE ALSO
++.B cache_check(8)
++.B cache_dump(8)
++.B cache_repair(8)
++.B cache_restore(8)
++
++.SH AUTHOR
++Heinz Mauelshagen <HeinzM@RedHat.com>
