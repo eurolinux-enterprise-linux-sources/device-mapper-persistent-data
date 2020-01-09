@@ -1,0 +1,29 @@
+--- thin-provisioning-tools-0.2.8/man8/thin_check.8.orig	2014-04-14 12:08:05.057628239 +0200
++++ thin-provisioning-tools-0.2.8/man8/thin_check.8	2014-04-14 12:13:43.313486607 +0200
+@@ -1,6 +1,6 @@
+ .TH THIN_CHECK 8 "Thin Provisioning Tools" "Red Hat, Inc." \" -*- nroff -*-
+ .SH NAME
+-thin_check \- repair thin provisioning metadata on device or file
++thin_check \- check thin provisioning metadata on device or file for consistency
+ 
+ .SH SYNOPSIS
+ .B thin_check
+@@ -32,6 +32,10 @@
+ Skip checking of the block mappings which make up the bulk of the
+ metadata.
+ 
++.IP "\fB\-\-clear\-needs\-check\-flag\fP"
++clears the needs_check flag set in the metadata by the thin provisioning target
++only if there's no metadata error.
++
+ .IP "\fB\-\-ignore\-non\-fatal\-errors\fP"
+ .B thin_check
+ will only return a non-zero exit code if it finds a fatal
+@@ -40,6 +44,7 @@
+ fact isn't.  Ignoring errors for a long time is not advised, you
+ really should be using thin_repair to fix them.
+ 
++
+ .SH EXAMPLE
+ Analyses and repairs thin provisioning metadata on logical volume
+ /dev/vg/metadata:

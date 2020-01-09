@@ -1,0 +1,27 @@
+From 7ca0a9a4f75a6826bb9c9d8cd71d17402a523b53 Mon Sep 17 00:00:00 2001
+From: Heinz Mauelshagen <heinzm@redhat.com>
+Date: Wed, 30 Oct 2013 14:12:41 +0100
+Subject: [PATCH 1/2] Fix bz#960284: thin_dump and other persistent-data tools
+ may perform IO to misaligned buffers (on 4K hard sectored evices)
+
+Signed-off-by: Heinz Mauelshagen <heinzm@redhat.com>
+---
+ persistent-data/buffer.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git 0.2.8.orig/persistent-data/buffer.h 0.2.8/persistent-data/buffer.h
+index b1a7989..527a239 100644
+--- 0.2.8.orig/persistent-data/buffer.h
++++ 0.2.8/persistent-data/buffer.h
+@@ -41,7 +41,7 @@ namespace persistent_data {
+ 	// guarantees.
+ 	//
+ 	// Alignment must be a power of two.
+-	template <uint32_t Size = DEFAULT_BUFFER_SIZE, uint32_t Alignment = 512>
++	template <uint32_t Size = DEFAULT_BUFFER_SIZE, uint32_t Alignment = 4096>
+ 	class buffer : private boost::noncopyable {
+ 	public:
+ 		BOOST_STATIC_ASSERT((Alignment > 1) & !(Alignment & (Alignment - 1)));
+-- 
+1.9.0
+
