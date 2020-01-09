@@ -253,7 +253,9 @@ superblock_traits::pack(superblock const &sb, superblock_disk &disk)
 	disk.write_hits = to_disk<le32>(core.write_hits);
 	disk.write_misses = to_disk<le32>(core.write_misses);
 
-	if (core.version >= 2)
+	// The version may be overridden, meaning the dirty root may not
+	// actually be present.
+	if (core.version >= 2 && core.dirty_root)
 		disk.dirty_root = to_disk<le64>(*core.dirty_root);
 }
 
@@ -363,7 +365,7 @@ caching::check_superblock(superblock const &sb,
 
 	if (sb.magic != SUPERBLOCK_MAGIC) {
 		ostringstream msg;
-		msg << "magic in incorrect: " << sb.magic;
+		msg << "magic is incorrect: " << sb.magic;
 		visitor.visit(superblock_invalid(msg.str()));
 	}
 

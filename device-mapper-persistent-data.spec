@@ -2,25 +2,17 @@
 # Copyright (C) 2011-2017 Red Hat, Inc
 #
 
-%define pre_release_upstream -rc6
-%define pre_release rc6
-
 Summary: Device-mapper Persistent Data Tools
 Name: device-mapper-persistent-data
-Version: 0.7.0
-Release: 0.1.%{pre_release}%{?dist}.1
+Version: 0.7.3
+Release: 3%{?dist}
 License: GPLv3+
 Group: System Environment/Base
 URL: https://github.com/jthornber/thin-provisioning-tools
-Source0: https://github.com/jthornber/thin-provisioning-tools/archive/thin-provisioning-tools-%{version}%{pre_release_upstream}.tar.gz
-# Source1: https://github.com/jthornber/thin-provisioning-tools/archive/v%{version}.tar.gz
-Patch0: device-mapper-persistent-data-document-clear-needs-check-flag.patch
-Patch1: device-mapper-persistent-data-add-era_restore-and-cache_metadata_size-man-pages.patch
-Patch2: device-mapper-persistent-data-avoid-strip.patch
-# Commit: 4da8d19f296a9
-Patch3: device-mapper-persistent-data-cache_restore-fix-metadata-version-and-clean-shutdown.patch
-# Commit: e3b7d825696c2
-Patch4: device-mapper-persistent-data-cache_restore-v2-dirty-bitset-root-not-written.patch
+#Source0: https://github.com/jthornber/thin-provisioning-tools/archive/thin-provisioning-tools-% {version}.tar.gz
+Source0: https://github.com/jthornber/thin-provisioning-tools/archive/v%{version}.tar.gz
+Patch0: device-mapper-persistent-data-avoid-strip.patch
+Patch1: device-mapper-persistent-data-cache_restore-v2-dirty-bitset.patch
 
 BuildRequires: autoconf, expat-devel, libaio-devel, libstdc++-devel, boost-devel
 Requires: expat
@@ -34,12 +26,9 @@ are included and era check, dump, restore and invalidate to manage
 snapshot eras
 
 %prep
-%setup -q -n thin-provisioning-tools-%{version}%{pre_release_upstream}
-%patch0 -p1 -b .clear_needs_check_flag
-%patch1 -p1 -b .man_pages
-%patch2 -p1 -b .avoid_strip
-%patch3 -p1 -b .fix_flags
-%patch4 -p1 -b .v2_dirty_bitset_root
+%setup -q -n thin-provisioning-tools-%{version}
+%patch0 -p1 -b .avoid_strip
+%patch1 -p1 -b .v2_dirty_bitset
 echo %{version}-%{release} > VERSION
 
 %build
@@ -56,12 +45,14 @@ make DESTDIR=%{buildroot} MANDIR=%{_mandir} install
 %doc COPYING README.md
 %{_mandir}/man8/cache_check.8.gz
 %{_mandir}/man8/cache_dump.8.gz
+%{_mandir}/man8/cache_metadata_size.8.gz
 %{_mandir}/man8/cache_repair.8.gz
 %{_mandir}/man8/cache_restore.8.gz
 %{_mandir}/man8/cache_writeback.8.gz
 %{_mandir}/man8/era_check.8.gz
 %{_mandir}/man8/era_dump.8.gz
 %{_mandir}/man8/era_invalidate.8.gz
+%{_mandir}/man8/era_restore.8.gz
 %{_mandir}/man8/thin_check.8.gz
 %{_mandir}/man8/thin_delta.8.gz
 %{_mandir}/man8/thin_dump.8.gz
@@ -91,11 +82,25 @@ make DESTDIR=%{buildroot} MANDIR=%{_mandir} install
 %{_sbindir}/thin_restore
 %{_sbindir}/thin_rmap
 %{_sbindir}/thin_trim
-%{_sbindir}/thin_show_duplicates
 
 %changelog
-* Mon Nov 20 2017 Marian Csontos <mcsontos@redhat.com> - 0.7.0-0.1-rc6.el7_4.1
-- Fix v2 metadata corruption in cache_restore.
+* Tue Nov 14 2017 Marian Csontos <mcsontos@redhat.com> - 0.7.3-3
+- Fix version 2 metadata corruption in cache_restore.
+
+* Tue Oct 10 2017 Marian Csontos <mcsontos@redhat.com> - 0.7.3-2
+- Rebuilding with updated source tarball.
+
+* Fri Oct 06 2017 Marian Csontos <mcsontos@redhat.com> - 0.7.3-1
+- Update to latest bugfix and documentation update release.
+- *_restore tools wipe superblock as a last resort.
+- Add thin_check --override-mapping-root.
+
+* Fri Sep 22 2017 Marian Csontos <mcsontos@redhat.com> - 0.7.2-1
+- Update to latest upstream release including various bug fixes and new features.
+- Fix segfault when dump tools are given a tiny metadata file.
+- Fix -V exiting with 1.
+- Fix thin_check when running on XML dump instead of binary data.
+- Speed up free block searches.
 
 * Mon Mar 27 2017 Peter Rajnoha <prajnoha@redhat.com> - 0.7.0-0.1-rc6
 - Don't open devices as writeable if --clear-needs-check-flag is not set.

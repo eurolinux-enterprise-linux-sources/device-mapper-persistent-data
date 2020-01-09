@@ -120,12 +120,7 @@ namespace {
 
 		ref_t lookup(unsigned b) const {
 			read_ref rr = tm_.read_lock(ie_.blocknr_, validator_);
-			void const *bits = bitmap_data(rr);
-			ref_t b1 = test_bit_le(bits, b * 2);
-			ref_t b2 = test_bit_le(bits, b * 2 + 1);
-			ref_t result = b2 ? 1 : 0;
-			result |= b1 ? 2 : 0;
-			return result;
+			return __lookup_raw(bitmap_data(rr), b);
 		}
 
 		void insert(unsigned b, ref_t n) {
@@ -158,8 +153,10 @@ namespace {
 		}
 
 		boost::optional<unsigned> find_free(unsigned begin, unsigned end) {
+			read_ref rr = tm_.read_lock(ie_.blocknr_, validator_);
+			void const *bits = bitmap_data(rr);
 			for (unsigned i = max(begin, ie_.none_free_before_); i < end; i++)
-				if (lookup(i) == 0)
+				if (__lookup_raw(bits, i) == 0)
 					return boost::optional<unsigned>(i);
 
 			return boost::optional<unsigned>();
@@ -191,6 +188,14 @@ namespace {
 		void const *bitmap_data(transaction_manager::read_ref &rr) const {
 			bitmap_header const *h = reinterpret_cast<bitmap_header const *>(rr.data());
 			return h + 1;
+		}
+
+		ref_t __lookup_raw(void const *bits, unsigned b) const {
+			ref_t b1 = test_bit_le(bits, b * 2);
+			ref_t b2 = test_bit_le(bits, b * 2 + 1);
+			ref_t result = b2 ? 1 : 0;
+			result |= b1 ? 2 : 0;
+			return result;
 		}
 
 		transaction_manager &tm_;
@@ -260,6 +265,7 @@ namespace {
 			  indexes_(indexes),
 			  nr_blocks_(0),
 			  nr_allocated_(0),
+			  search_start_(0),
 			  ref_counts_(tm_, ref_count_traits::ref_counter()) {
 		}
 
@@ -271,6 +277,7 @@ namespace {
 			  indexes_(indexes),
 			  nr_blocks_(root.nr_blocks_),
 			  nr_allocated_(root.nr_allocated_),
+			  search_start_(0),
 			  ref_counts_(tm_, root.ref_count_root_, ref_count_traits::ref_counter()) {
 		}
 
@@ -290,49 +297,90 @@ namespace {
 			return count;
 		}
 
-		void set_count(block_address b, ref_t c) {
-			ref_t old = get_count(b);
+		template <typename Mut>
+		void modify_count(block_address b, Mut const &m) {
+			check_block(b);
 
-			if (c == old)
-				return;
+			index_entry ie = indexes_->find_ie(b / ENTRIES_PER_BLOCK);
+			bitmap bm(tm_, ie, bitmap_validator_);
+
+			ref_t old = bm.lookup(b % ENTRIES_PER_BLOCK);
+			if (old == 3)
+				old = lookup_ref_count(b);
+			ref_t c = m(old);
 
 			if (c > 2) {
-				if (old < 3)
-					insert_bitmap(b, 3);
+				if (old < 3) {
+					bm.insert(b % ENTRIES_PER_BLOCK, 3);
+					indexes_->save_ie(b / ENTRIES_PER_BLOCK, bm.get_ie());
+				}
 				insert_ref_count(b, c);
 			} else {
 				if (old > 2)
 					remove_ref_count(b);
-				insert_bitmap(b, c);
+				bm.insert(b % ENTRIES_PER_BLOCK, c);
+				indexes_->save_ie(b / ENTRIES_PER_BLOCK, bm.get_ie());
 			}
 
 			if (old == 0)
 				nr_allocated_++;
-			else if (c == 0)
+			else if (c == 0) {
+				if (b < search_start_)
+					search_start_ = b;
 				nr_allocated_--;
+			}
+		}
+
+		struct override {
+			override(ref_t new_value)
+				: new_value_(new_value) {
+				}
+
+			ref_t operator()(ref_t old) const {
+				return new_value_;
+			}
+
+			ref_t new_value_;
+		};
+
+		void set_count(block_address b, ref_t c) {
+			override m(c);
+			modify_count(b, m);
 		}
 
 		void commit() {
 			indexes_->commit_ies();
 		}
 
+		static ref_t inc_mutator(ref_t c) {
+			return c + 1;
+		}
+
+		static ref_t dec_mutator(ref_t c) {
+			return c - 1;
+		}
+
 		void inc(block_address b) {
-			// FIXME: 2 get_counts
-			ref_t old = get_count(b);
-			set_count(b, old + 1);
+			if (b == search_start_)
+				search_start_++;
+
+			modify_count(b, inc_mutator);
 		}
 
 		void dec(block_address b) {
-			ref_t old = get_count(b);
-			set_count(b, old - 1);
+			modify_count(b, dec_mutator);
 		}
 
-		// FIXME: keep track of the lowest free block so we
-		// can start searching from a suitable place.
 		maybe_block find_free(span_iterator &it) {
 			for (maybe_span ms = it.first(); ms; ms = it.next()) {
 				block_address begin = ms->first;
 				block_address end = ms->second;
+
+				if (end < search_start_)
+					continue;
+
+				if (begin < search_start_)
+					begin = search_start_;
 
 				block_address begin_index = begin / ENTRIES_PER_BLOCK;
 				block_address end_index = div_up<block_address>(end, ENTRIES_PER_BLOCK);
@@ -347,6 +395,8 @@ namespace {
 					boost::optional<unsigned> maybe_b = bm.find_free(bit_begin, bit_end);
 					if (maybe_b) {
 						block_address b = (index * ENTRIES_PER_BLOCK) + *maybe_b;
+						if (b)
+							search_start_ = b - 1;
 						return b;
 					}
 				}
@@ -526,6 +576,7 @@ namespace {
 		index_store::ptr indexes_;
 		block_address nr_blocks_;
 		block_address nr_allocated_;
+		block_address search_start_;
 
 		btree<1, ref_count_traits> ref_counts_;
 	};

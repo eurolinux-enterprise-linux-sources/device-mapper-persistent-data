@@ -80,16 +80,6 @@ namespace local {
 
 	//--------------------------------
 
-	transaction_manager::ptr
-	open_tm(block_manager<>::ptr bm) {
-		space_map::ptr sm(new core_map(bm->get_nr_blocks()));
-		sm->inc(superblock_detail::SUPERBLOCK_LOCATION);
-		transaction_manager::ptr tm(new transaction_manager(bm, sm));
-		return tm;
-	}
-
-	//--------------------------------
-
 	struct mapping {
 		mapping()
 			: vbegin_(0),
@@ -662,7 +652,8 @@ thin_delta_cmd::run(int argc, char **argv)
 		{ "thin2", required_argument, NULL, 2 },
 		{ "snap2", required_argument, NULL, 2 },
 		{ "metadata-snap", optional_argument, NULL, 'm' },
-		{ "verbose", no_argument, NULL, 4 }
+		{ "verbose", no_argument, NULL, 4 },
+		{ NULL, no_argument, NULL, 0 }
 	};
 
 	while ((c = getopt_long(argc, argv, shortopts, longopts, NULL)) != -1) {

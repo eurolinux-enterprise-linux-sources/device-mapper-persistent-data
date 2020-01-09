@@ -1,8 +1,12 @@
-diff -purN thin-provisioning-tools-0.6.0.orig/Makefile.in thin-provisioning-tools-0.6.0.new/Makefile.in
---- thin-provisioning-tools-0.6.0.orig/Makefile.in	2016-01-20 16:43:21.000000000 +0100
-+++ thin-provisioning-tools-0.6.0.new/Makefile.in	2016-01-20 17:26:11.943664295 +0100
-@@ -174,7 +174,6 @@ distclean: clean
- install: bin/pdata_tools
+ Makefile.in | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/Makefile.in b/Makefile.in
+index 0aa9401..0f4f7cb 100644
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -262,7 +262,6 @@ MANPAGES:=$(patsubst %,man8/%.8,$(TOOLS))
+ install: bin/pdata_tools $(MANPAGES)
  	$(INSTALL_DIR) $(BINDIR)
  	$(INSTALL_PROGRAM) bin/pdata_tools $(BINDIR)
 -	$(STRIP) $(BINDIR)/pdata_tools

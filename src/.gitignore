@@ -1,15 +1,21 @@
 *~
+*.tmp
+*.swp
+*.swo
 *.o
 *.so
 *.a
 *.gmo
 *_t
 *.d
+*.8
 *.d.[0-9]*
 test.data
 cachegrind.*
 \#*\#
 core
+
+googletest/
 
 bin/pdata_tools
 thin_check

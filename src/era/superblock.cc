@@ -3,10 +3,13 @@
 #include "persistent-data/checksum.h"
 #include "persistent-data/errors.h"
 
+#include <sstream>
+
 using namespace base;
 using namespace era;
 using namespace superblock_damage;
 using namespace persistent_data;
+using namespace std;
 
 //----------------------------------------------------------------
 
@@ -280,7 +283,7 @@ era::check_superblock(superblock const &sb,
 
 	if (sb.magic != SUPERBLOCK_MAGIC) {
 		ostringstream msg;
-		msg << "magic in incorrect: " << sb.magic;
+		msg << "magic is incorrect: " << sb.magic;
 		visitor.visit(superblock_invalid(msg.str()));
 	}
 
@@ -329,6 +332,7 @@ era::check_superblock(persistent_data::block_manager<>::ptr bm,
 
 	try {
 		sb = read_superblock(bm, SUPERBLOCK_LOCATION);
+		check_superblock(sb, nr_metadata_blocks, visitor);
 
 	} catch (std::exception const &e) {
 
@@ -338,8 +342,6 @@ era::check_superblock(persistent_data::block_manager<>::ptr bm,
 
 		visitor.visit(superblock_corrupt(e.what()));
 	}
-
-	check_superblock(sb, nr_metadata_blocks, visitor);
 }
 
 

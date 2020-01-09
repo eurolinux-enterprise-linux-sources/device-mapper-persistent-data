@@ -51,7 +51,6 @@ namespace bcache {
 			BF_IO_PENDING = (1 << 0),
 			BF_DIRTY = (1 << 1),
 			BF_FLUSH = (1 << 2),
-			BF_PREVIOUSLY_DIRTY = (1 << 3)
 		};
 
 		class block : private boost::noncopyable {
@@ -222,8 +221,9 @@ namespace bcache {
 		void issue_read(block &b);
 		void issue_write(block &b);
 		void wait_io();
-		block_list &__categorise(block &b);
-		void hit(block &b);
+		void unlink_block(block &b);
+		void link_block(block &b);
+		void relink(block &b);
 		void wait_all();
 		void wait_specific(block &b);
 		unsigned writeback(unsigned count);
@@ -238,11 +238,12 @@ namespace bcache {
 		void exit_free_list();
 
 		void preemptive_writeback();
+		bool maybe_flush(block_cache::block &b);
 		void release(block_cache::block &block);
 		void check_index(block_address index) const;
 
-		void inc_hit_counter(unsigned flags);
-		void inc_miss_counter(unsigned flags);
+		void hit(block &b, unsigned flags);
+		void miss(unsigned flags);
 
 		//--------------------------------
 
@@ -266,6 +267,9 @@ namespace bcache {
 		block_list dirty_;
 		block_list clean_;
 
+		// Because the block_list type doesn't have a constant time
+		// size() method, we have to manually keep track of the list
+		// sizes (tedious and error prone).
 		unsigned nr_locked_;
 		unsigned nr_dirty_;
 

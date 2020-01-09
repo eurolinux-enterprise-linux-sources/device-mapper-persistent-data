@@ -33,6 +33,7 @@ SOURCE=\
 	base/error_state.cc \
 	base/error_string.cc \
 	base/grid_layout.cc \
+	base/file_utils.cc \
 	base/progress_monitor.cc \
 	base/rolling_hash.cc \
 	base/xml_utils.cc \
@@ -192,7 +193,7 @@ else
 TEST_INCLUDES=
 endif
 
-.SUFFIXES: .d
+.SUFFIXES: .d .txt .8
 
 %.o: %.cc
 	@echo "    [CXX] $<"
@@ -201,6 +202,10 @@ endif
 	$(V) $(CXX) -MM -MT $(subst .cc,.o,$<) $(INCLUDES) $(TEST_INCLUDES) $(CXXFLAGS) $< > $*.$$$$; \
 	sed 's,\([^ :]*\)\.o[ :]*,\1.o \1.gmo $* : Makefile ,g' < $*.$$$$ > $*.d; \
 	$(RM) $*.$$$$
+
+%.8: %.txt bin/txt2man
+	@echo "    [txt2man] $<"
+	$(V) bin/txt2man -p -t $(basename $(notdir $<)) $< > $@
 
 #----------------------------------------------------------------
 
@@ -231,7 +236,30 @@ clean:
 distclean: clean
 	$(RM) config.cache config.log config.status configure.h version.h Makefile unit-tests/Makefile
 
-install: bin/pdata_tools
+TOOLS:=\
+	cache_check \
+	cache_dump \
+	cache_metadata_size \
+	cache_repair \
+	cache_restore \
+	cache_writeback \
+	thin_check \
+	thin_delta \
+	thin_dump \
+	thin_ls \
+	thin_repair \
+	thin_restore \
+	thin_rmap \
+	thin_metadata_size \
+	thin_trim \
+	era_check \
+	era_dump \
+	era_invalidate \
+	era_restore
+
+MANPAGES:=$(patsubst %,man8/%.8,$(TOOLS))
+
+install: bin/pdata_tools $(MANPAGES)
 	$(INSTALL_DIR) $(BINDIR)
 	$(INSTALL_PROGRAM) bin/pdata_tools $(BINDIR)
 	$(STRIP) $(BINDIR)/pdata_tools
@@ -248,9 +276,8 @@ install: bin/pdata_tools
 	ln -s -f pdata_tools $(BINDIR)/thin_repair
 	ln -s -f pdata_tools $(BINDIR)/thin_restore
 	ln -s -f pdata_tools $(BINDIR)/thin_rmap
-	ln -s -f pdata_tools $(BINDIR)/thin_show_duplicates
-	ln -s -f pdata_tools $(BINDIR)/thin_trim
 	ln -s -f pdata_tools $(BINDIR)/thin_metadata_size
+	ln -s -f pdata_tools $(BINDIR)/thin_trim
 	ln -s -f pdata_tools $(BINDIR)/era_check
 	ln -s -f pdata_tools $(BINDIR)/era_dump
 	ln -s -f pdata_tools $(BINDIR)/era_invalidate
@@ -258,6 +285,7 @@ install: bin/pdata_tools
 	$(INSTALL_DIR) $(MANPATH)/man8
 	$(INSTALL_DATA) man8/cache_check.8 $(MANPATH)/man8
 	$(INSTALL_DATA) man8/cache_dump.8 $(MANPATH)/man8
+	$(INSTALL_DATA) man8/cache_metadata_size.8 $(MANPATH)/man8
 	$(INSTALL_DATA) man8/cache_repair.8 $(MANPATH)/man8
 	$(INSTALL_DATA) man8/cache_restore.8 $(MANPATH)/man8
 	$(INSTALL_DATA) man8/cache_writeback.8 $(MANPATH)/man8
@@ -268,12 +296,14 @@ install: bin/pdata_tools
 	$(INSTALL_DATA) man8/thin_repair.8 $(MANPATH)/man8
 	$(INSTALL_DATA) man8/thin_restore.8 $(MANPATH)/man8
 	$(INSTALL_DATA) man8/thin_rmap.8 $(MANPATH)/man8
-	$(INSTALL_DATA) man8/thin_trim.8 $(MANPATH)/man8
 	$(INSTALL_DATA) man8/thin_metadata_size.8 $(MANPATH)/man8
 	$(INSTALL_DATA) man8/era_check.8 $(MANPATH)/man8
 	$(INSTALL_DATA) man8/era_dump.8 $(MANPATH)/man8
+	$(INSTALL_DATA) man8/era_restore.8 $(MANPATH)/man8
 	$(INSTALL_DATA) man8/era_invalidate.8 $(MANPATH)/man8
+	$(INSTALL_DATA) man8/thin_trim.8 $(MANPATH)/man8
 ifeq ("@DEVTOOLS@", "yes")
+	ln -s -f pdata_tools $(BINDIR)/thin_show_duplicates
 	ln -s -f pdata_tools $(BINDIR)/thin_ll_dump
 	ln -s -f pdata_tools $(BINDIR)/thin_show_duplicates
 	ln -s -f pdata_tools $(BINDIR)/thin_generate_metadata
