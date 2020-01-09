@@ -1,4 +1,6 @@
 #include <linux/dm-ioctl.h>
+#include <linux/kdev_t.h>
+#include <linux/fs.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -8,6 +10,7 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/sysmacros.h>
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -238,7 +241,7 @@ static bool list_devices(struct dm_interface *dmi, struct dm_ioctl *ctl,
 
 	if (nl->dev) {
 		for (;;) {
-			dlb_append(&dlb, major(nl->dev), minor(nl->dev), nl->name);
+			dlb_append(&dlb, MAJOR(nl->dev), MINOR(nl->dev), nl->name);
 
 			if (!nl->next)
 				break;
@@ -272,7 +275,9 @@ int dm_list_devices(struct dm_interface *dmi, struct dev_list **devs)
 	return r;
 }
 
-int dm_create_device(struct dm_interface *dmi, const char *name, const char *uuid)
+// Obviously major and minor are only valid if successful.
+int dm_create_device(struct dm_interface *dmi, const char *name, const char *uuid,
+		     uint32_t *major_result, uint32_t *minor_result)
 {
 	int r;
 	struct dm_ioctl *ctl = alloc_ctl(0);
@@ -293,8 +298,11 @@ int dm_create_device(struct dm_interface *dmi, const char *name, const char *uui
 	}
 
 	r = ioctl(dmi->fd, DM_DEV_CREATE, ctl);
+	if (!r) {
+		*major_result = MAJOR(ctl->dev);
+		*minor_result = MINOR(ctl->dev);
+	}
 	free_ctl(ctl);
-
 	return r;
 }
 
@@ -302,13 +310,17 @@ static int dev_cmd(struct dm_interface *dmi, const char *name, int request, unsi
 {
 	int r;
 	struct dm_ioctl *ctl = alloc_ctl(0);
+
+	if (!ctl)
+		return -ENOMEM;
+
 	ctl->flags = flags;
 	r = copy_name(ctl, name);
 	if (r) {
 		free_ctl(ctl);
 		return -ENOMEM;
 	}
-	r = ioctl(dmi->fd, request);
+	r = ioctl(dmi->fd, request, ctl);
 	free_ctl(ctl);
 
 	return r;
@@ -372,7 +384,16 @@ static int tb_append(struct target_builder *tb, uint64_t len, char *type, char *
 	t->next = NULL;
 	t->len = len;
 	t->type = strdup(type);
+	if (!t->type) {
+		free(t);
+		return -ENOMEM;
+	}
 	t->args = strdup(args);
+	if (!t->args) {
+		free(t->type);
+		free(t);
+		return -ENOMEM;
+	}
 
 	if (tb->head) {
 		tb->tail->next = t;
@@ -389,8 +410,6 @@ static struct target *tb_get(struct target_builder *tb)
 }
 
 //----------------------------------------------------------------
-// FIXME: provide some way of freeing a target list.
-// FIXME: check the result from alloc_ctl is always being checked.
 
 static size_t calc_load_payload(struct target *t)
 {
@@ -412,6 +431,7 @@ static int prep_load(struct dm_ioctl *ctl, size_t payload_size,
 	uint64_t current_sector = 0;
 	struct dm_target_spec *spec;
 
+	ctl->target_count = 0;
 	spec = payload(ctl);
 
 	while (t) {
@@ -423,22 +443,24 @@ static int prep_load(struct dm_ioctl *ctl, size_t payload_size,
 		if (r)
 			return r;
 
-		r = copy_string((char *) spec + 1, t->args, payload_size);
+		r = copy_string((char *) (spec + 1), t->args, payload_size);
 		if (r)
 			return r;
 
 		spec->next = sizeof(*spec) + round_up(strlen(t->args) + 1, 8);
 		payload_size -= spec->next;
+
 		spec = (struct dm_target_spec *) (((char *) spec) + spec->next);
 
+		ctl->target_count++;
 		t = t->next;
 	}
 
-	return true;
+	return 0;
 }
 
 int dm_load(struct dm_interface *dmi, const char *name,
-	    struct target *targets)
+		struct target *targets)
 {
 	int r;
 	size_t payload_size = calc_load_payload(targets);
@@ -465,8 +487,6 @@ int dm_load(struct dm_interface *dmi, const char *name,
 	return r;
 }
 
-//----------------------------------------------------------------
-// returns false if control buffer too small.
 static bool get_status(struct dm_interface *dmi, struct dm_ioctl *ctl,
 		       const char *name, unsigned flags,
 		       int *result)
@@ -495,11 +515,12 @@ static int unpack_status(struct dm_ioctl *ctl, struct target **result)
 	unsigned i;
 	struct target_builder tb;
 	struct dm_target_spec *spec = payload(ctl);
+	char *spec_start = (char *) spec;
 
 	tb_init(&tb);
 	for (i = 0; i < ctl->target_count; i++) {
 		tb_append(&tb, spec->length, spec->target_type, (char *) (spec + 1));
-		spec = (struct dm_target_spec *) (((char *) spec) + spec->next);
+		spec = (struct dm_target_spec *) (spec_start + spec->next);
 	}
 
 	*result = tb_get(&tb);
@@ -526,6 +547,9 @@ retry:
 
 		goto retry;
 	}
+
+	if (r)
+		return r;
 
 	r = unpack_status(ctl, targets);
 	free_ctl(ctl);
@@ -567,6 +591,40 @@ int dm_message(struct dm_interface *dmi, const char *name, uint64_t sector,
 
 	r = ioctl(dmi->fd, DM_TARGET_MSG, ctl);
 	free_ctl(ctl);
+
+	return r;
+}
+
+int get_dev_size(const char *path, uint64_t *sectors)
+{
+	int r, fd;
+
+	fd = open(path, O_RDONLY);
+	if (fd < 0)
+		return -EINVAL;
+
+	r = ioctl(fd, BLKGETSIZE64, sectors);
+	(*sectors) /= 512;
+	close(fd);
+	return r;
+}
+
+int discard(const char *path, uint64_t sector_b, uint64_t sector_e)
+{
+	int r, fd;
+	uint64_t payload[2];
+
+	fd = open(path, O_RDWR);
+	if (fd < 0) {
+        	fprintf(stderr, "couldn't open %s", path);
+		return -EINVAL;
+	}
+
+	payload[0] = sector_b;
+	payload[1] = sector_e;
+
+	r = ioctl(fd, BLKDISCARD, payload);
+	close(fd);
 
 	return r;
 }

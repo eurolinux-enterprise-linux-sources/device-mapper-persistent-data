@@ -14,12 +14,13 @@
     disable-unlink)
 
   (import (chezscheme)
+	  (disk-units)
           (fmt fmt)
           (srfi s8 receive)
           (only (srfi s1 lists) span))
 
   ;; FIXME: global var!  Not thread safe.
-  (define working-dir "/tmp")
+  (define working-dir ".")
 
   (define (working-directory) working-dir)
 
@@ -94,10 +95,31 @@
                 (with-temp-file-containing (rest ...)
                                            b1 b2 ...))))))
 
+   (define (safe-to-bytes maybe-size)
+      (if (disk-size? maybe-size)
+	  (to-bytes maybe-size)
+	  maybe-size))
+
+   (define (suitable-block-size size)
+     (let loop ((bs (* 1024 1024 4)))
+       (if (> (mod size bs) 0)
+         (loop (/ bs 2))
+         bs)))
+  
+   ;; It's much faster if we write large blocks
+   (define (dd-zero-file path size)
+     (let* ((bytes (safe-to-bytes size))
+            (bs (suitable-block-size bytes))
+            (count (floor (/ bytes bs))))
+       (system (fmt #f "dd if=/dev/zero of=" path
+                       " bs=" (wrt bs)
+                       " count=" (wrt count)
+                       " 2> /dev/null > /dev/null"))))
+
    (define (with-temp-file-sized-thunk filename size fn)
      (with-temp-file-thunk filename
        (lambda (path)
-         (system (fmt #f "fallocate -l " (wrt size) " " path))
+         (dd-zero-file path size)
          (fn path))))
 
    (define-syntax with-temp-file-sized

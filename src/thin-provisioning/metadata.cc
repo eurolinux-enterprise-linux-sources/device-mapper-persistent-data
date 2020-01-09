@@ -33,6 +33,8 @@
 using namespace base;
 using namespace thin_provisioning;
 
+#define METADATA_VERSION 2
+
 //----------------------------------------------------------------
 
 namespace {
@@ -59,7 +61,7 @@ metadata::metadata(block_manager<>::ptr bm, open_type ot,
 		tm_ = open_tm(bm, SUPERBLOCK_LOCATION);
 		sb_ = read_superblock(tm_->get_bm());
 
-		if (sb_.version_ != 1)
+		if (sb_.version_ < METADATA_VERSION)
 			throw runtime_error("unknown metadata version");
 
 		metadata_sm_ = open_metadata_sm(*tm_, &sb_.metadata_space_map_root_);
@@ -69,7 +71,7 @@ metadata::metadata(block_manager<>::ptr bm, open_type ot,
 		details_ = device_tree::ptr(new device_tree(*tm_, sb_.device_details_root_,
 							    device_tree_detail::device_details_traits::ref_counter()));
 		mappings_top_level_ = dev_tree::ptr(new dev_tree(*tm_, sb_.data_mapping_root_,
-								 mapping_tree_detail::mtree_ref_counter(tm_)));
+								 mapping_tree_detail::mtree_ref_counter(*tm_)));
 		mappings_ = mapping_tree::ptr(new mapping_tree(*tm_, sb_.data_mapping_root_,
 							       mapping_tree_detail::block_time_ref_counter(data_sm_)));
 		break;
@@ -87,16 +89,16 @@ metadata::metadata(block_manager<>::ptr bm, open_type ot,
 		mappings_ = mapping_tree::ptr(new mapping_tree(*tm_,
 							       mapping_tree_detail::block_time_ref_counter(data_sm_)));
 		mappings_top_level_ = dev_tree::ptr(new dev_tree(*tm_, mappings_->get_root(),
-								 mapping_tree_detail::mtree_ref_counter(tm_)));
+								 mapping_tree_detail::mtree_ref_counter(*tm_)));
 
 		::memset(&sb_, 0, sizeof(sb_));
 		sb_.magic_ = SUPERBLOCK_MAGIC;
-		sb_.version_ = 1;
+		sb_.version_ = METADATA_VERSION;
 		sb_.data_mapping_root_ = mappings_->get_root();
 		sb_.device_details_root_ = details_->get_root();
 		sb_.data_block_size_ = data_block_size;
 		sb_.metadata_block_size_ = MD_BLOCK_SIZE >> SECTOR_SHIFT;
-		sb_.metadata_nr_blocks_ = tm_->get_bm()->get_nr_blocks();
+		sb_.metadata_nr_blocks_ = metadata_sm_->get_nr_blocks();
 
 		break;
 	}
@@ -132,6 +134,13 @@ metadata::metadata(block_manager<>::ptr bm,
 	open_btrees();
 }
 
+metadata::metadata(block_manager<>::ptr bm, superblock_detail::superblock const &sb)
+{
+	tm_ = open_tm(bm, SUPERBLOCK_LOCATION);
+	sb_ = sb;
+	open_btrees();
+}
+
 void
 metadata::commit()
 {
@@ -162,7 +171,7 @@ void metadata::open_btrees()
 	details_ = device_tree::ptr(new device_tree(*tm_, sb_.device_details_root_,
 						    device_tree_detail::device_details_traits::ref_counter()));
 	mappings_top_level_ = dev_tree::ptr(new dev_tree(*tm_, sb_.data_mapping_root_,
-							 mapping_tree_detail::mtree_ref_counter(tm_)));
+							 mapping_tree_detail::mtree_ref_counter(*tm_)));
 	mappings_ = mapping_tree::ptr(new mapping_tree(*tm_, sb_.data_mapping_root_,
 						       mapping_tree_detail::block_time_ref_counter(data_sm_)));
 }

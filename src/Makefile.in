@@ -21,8 +21,15 @@ V=@
 PROGRAMS=\
 	bin/pdata_tools
 
+ifeq ("@TESTING@", "yes")
+TESTLIBS=\
+	lib/libft.so
+endif
+
 .PHONY: all
-all: $(PROGRAMS)
+all: $(PROGRAMS) $(TESTLIBS)
+
+include contrib/Makefile
 
 SOURCE=\
 	base/output_file_requirements.cc \
@@ -111,6 +118,8 @@ SOURCE=\
 	thin-provisioning/xml_format.cc
 
 DEVTOOLS_SOURCE=\
+	thin-provisioning/thin_journal.cc \
+	thin-provisioning/thin_journal_check.cc \
 	thin-provisioning/thin_ll_dump.cc \
 	thin-provisioning/thin_ll_restore.cc \
 	thin-provisioning/thin_show_duplicates.cc \
@@ -135,10 +144,8 @@ CXX:=@CXX@
 STRIP:=@STRIP@
 OBJECTS:=$(subst .cc,.o,$(SOURCE))
 
-# FIXME EMITTERS += $(PLUGIN_LIBS) doesn't work, probably because it's empty at
-# the time of use?
 ifeq ("@STATIC@", "yes")
-EMITTERS += contrib/*.a
+EMITTERS += $(PLUGIN_LIBS)
 endif
 
 TOP_DIR:=@top_srcdir@
@@ -197,24 +204,37 @@ endif
 
 %.o: %.cc
 	@echo "    [CXX] $<"
+	@mkdir -p $(dir $@)
 	$(V) $(CXX) -c $(INCLUDES) $(CXXFLAGS) -o $@ $<
 	@echo "    [DEP] $<"
 	$(V) $(CXX) -MM -MT $(subst .cc,.o,$<) $(INCLUDES) $(TEST_INCLUDES) $(CXXFLAGS) $< > $*.$$$$; \
 	sed 's,\([^ :]*\)\.o[ :]*,\1.o \1.gmo $* : Makefile ,g' < $*.$$$$ > $*.d; \
 	$(RM) $*.$$$$
 
+%.o: %.c
+	@echo "    [CC] $<"
+	@mkdir -p $(dir $@)
+	$(V) $(CC) -c $(INCLUDES) $(CFLAGS) -o $@ $<
+	@echo "    [DEP] $<"
+	$(V) $(CC) -MM -MT $(subst .cc,.o,$<) $(INCLUDES) $(TEST_INCLUDES) $(CFLAGS) $< > $*.$$$$; \
+	sed 's,\([^ :]*\)\.o[ :]*,\1.o \1.gmo $* : Makefile ,g' < $*.$$$$ > $*.d; \
+	$(RM) $*.$$$$
+
 %.8: %.txt bin/txt2man
 	@echo "    [txt2man] $<"
+	@mkdir -p $(dir $@)
 	$(V) bin/txt2man -p -t $(basename $(notdir $<)) $< > $@
 
 #----------------------------------------------------------------
 
 lib/libpdata.a: $(OBJECTS) $(EMITTERS)
 	@echo "    [AR]  $<"
+	@mkdir -p $(dir $@)
 	$(V)ar -rv $@ $(OBJECTS) $(EMITTERS) > /dev/null 2>&1
 
 bin/pdata_tools: $(OBJECTS) $(EMITTERS)
 	@echo "    [LD]  $@"
+	@mkdir -p $(dir $@)
 	$(V) $(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $+ $(LIBS) $(CXXLIB)
 
 #----------------------------------------------------------------
@@ -231,7 +251,7 @@ clean:
 	find . -name \*.o -delete
 	find . -name \*.gmo -delete
 	find . -name \*.d -delete
-	$(RM) $(TEST_PROGRAMS) $(PROGRAMS) $(GMOCK_OBJECTS) lib/*.a
+	$(RM) $(TEST_PROGRAMS) $(PROGRAMS) $(GMOCK_OBJECTS) lib/*.a lib/*.so
 
 distclean: clean
 	$(RM) config.cache config.log config.status configure.h version.h Makefile unit-tests/Makefile
@@ -314,17 +334,26 @@ endif
 
 .PHONY: install
 
-include contrib/Makefile
-
 ifeq ("@TESTING@", "yes")
 include unit-tests/Makefile
 
-.PHONEY: features
+LIBFT_SOURCE=\
+	ft-lib/bcache.c \
+	ft-lib/crc32c.c \
+	ft-lib/dm-ioctl.c
 
-features: pdata_tools
-	cucumber --no-color --format progress
+LIBFT_OBJECTS=$(subst .c,.o,$(LIBFT_SOURCE))
 
-test: features unit-test
+lib/libft.so: $(LIBFT_OBJECTS)
+	@echo "    [LD]" $@
+	$(V) gcc -shared -o $@ $+ -laio
+
+.PHONEY: functional-test unit-test
+
+functional-test: bin/pdata_tools lib/libft.so
+	cd functional-tests && ./run-tests run
+
+test: functional-test unit-test
 endif
 
 -include $(DEPEND_FILES)

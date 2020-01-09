@@ -40,19 +40,21 @@ namespace {
 	struct flags {
 		flags()
 			: format("xml"),
+			  repair(false),
 			  use_metadata_snap(false) {
 		}
 
 		dump_options opts;
 
 		string format;
+		bool repair;
 		bool use_metadata_snap;
 		optional<block_address> snap_location;
 	};
 
 	metadata::ptr open_metadata(string const &path, struct flags &flags) {
 		block_manager<>::ptr bm = open_bm(path, block_manager<>::READ_ONLY, !flags.use_metadata_snap);
-		metadata::ptr md(flags.use_metadata_snap ? new metadata(bm, flags.snap_location) : new metadata(bm));
+		metadata::ptr md(flags.use_metadata_snap ? new metadata(bm, flags.snap_location) : new metadata(bm, false));
 
 		return md;
 	}
@@ -84,9 +86,15 @@ namespace {
 
 	int dump_(string const &path, ostream &out, struct flags &flags) {
 		try {
-			metadata::ptr md = open_metadata(path, flags);
 			emitter::ptr e = create_emitter(flags.format, out);
-			metadata_dump(md, e, flags.opts);
+
+			if (flags.repair) {
+				auto bm = open_bm(path, block_manager<>::READ_ONLY, true);
+				metadata_repair(bm, e);
+			} else {
+				metadata::ptr md = open_metadata(path, flags);
+				metadata_dump(md, e, flags.opts);
+			}
 
 		} catch (std::exception &e) {
 			cerr << e.what() << endl;
@@ -161,7 +169,7 @@ thin_dump_cmd::run(int argc, char **argv)
 			break;
 
 		case 'r':
-			flags.opts.repair_ = true;
+			flags.repair = true;
 			break;
 
 		case 'm':

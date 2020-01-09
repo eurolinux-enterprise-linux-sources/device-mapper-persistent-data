@@ -390,7 +390,8 @@ namespace {
 
 					bitmap bm(tm_, ie, bitmap_validator_);
 					unsigned bit_begin = (index == begin_index) ? (begin % ENTRIES_PER_BLOCK) : 0;
-					unsigned bit_end = (index == end_index - 1) ? (end % ENTRIES_PER_BLOCK) : ENTRIES_PER_BLOCK;
+					unsigned bit_end = (index == end_index - 1) ?
+							   (end - ENTRIES_PER_BLOCK * index) : ENTRIES_PER_BLOCK;
 
 					boost::optional<unsigned> maybe_b = bm.find_free(bit_begin, bit_end);
 					if (maybe_b) {
@@ -422,7 +423,7 @@ namespace {
 				index_entry ie;
 				ie.blocknr_ = wr.get_location();
 				ie.nr_free_ = i == (bitmap_count - 1) ?
-					(nr_blocks % ENTRIES_PER_BLOCK) : ENTRIES_PER_BLOCK;
+					(nr_blocks - ENTRIES_PER_BLOCK * i) : ENTRIES_PER_BLOCK;
 				ie.none_free_before_ = 0;
 
 				indexes_->save_ie(i, ie);
@@ -462,7 +463,7 @@ namespace {
 			unsigned nr_indexes = div_up<block_address>(nr_blocks_, ENTRIES_PER_BLOCK);
 
 			for (unsigned i = 0; i < nr_indexes; i++) {
-				unsigned hi = (i == nr_indexes - 1) ? (nr_blocks_ % ENTRIES_PER_BLOCK) : ENTRIES_PER_BLOCK;
+				unsigned hi = (i == nr_indexes - 1) ? (nr_blocks_ - ENTRIES_PER_BLOCK * i) : ENTRIES_PER_BLOCK;
 				index_entry ie = indexes_->find_ie(i);
 				bitmap bm(tm_, ie, bitmap_validator_);
 				bm.iterate(i * ENTRIES_PER_BLOCK, hi, wrapper);

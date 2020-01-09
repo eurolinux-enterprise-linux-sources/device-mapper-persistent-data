@@ -21,7 +21,11 @@
     assert-eof
     assert-starts-with
     assert-matches
-    assert-superblock-untouched)
+    assert-superblock-untouched
+    assert-member?
+    assert-raises-thunk
+    assert-raises
+    assert-every)
 
   (import
     (chezscheme)
@@ -33,6 +37,7 @@
     (regex)
     (temp-file)
     (utils)
+    (only (srfi s1 lists) every)
     (srfi s8 receive))
 
   ;;;--------------------------------------------------------------------
@@ -87,7 +92,7 @@
       (fmt #t
            (cat (fmt-keys prev-keys keys)
                 (dsp #\space)
-                (pad-char #\. (space-to 38))
+                (pad-char #\. (space-to 60))
                 (dsp #\space)))
       (flush)
       (fmt #t (cat (fn keys) nl))
@@ -106,6 +111,15 @@
     (apply string-append cwd "/"
            (intersperse "/" (map symbol->string keys))))
 
+  (define (log-exceptions thunk)
+    (with-exception-handler
+      (lambda (x)
+        (let-values (((txt-port get) (open-string-output-port)))
+          (display-condition x txt-port)
+          (log-error (get)))
+        (raise x))
+      thunk))
+
   (define-syntax define-scenario
     (lambda (x)
       (syntax-case x ()
@@ -119,7 +133,7 @@
                                        (file-options no-fail)
                                        (buffer-mode line)
                                        (native-transcoder))
-                        b1 b2 ...)))))))))
+                        (log-exceptions (lambda () b1 b2 ...)))))))))))
 
   (define (fail msg)
     (raise (condition
@@ -144,9 +158,9 @@
             (if (error? x)
                 (k #f)
                 (raise x)))
-            (lambda ()
-              (thunk)
-              #t)))))
+          (lambda ()
+            (thunk)
+            #t)))))
 
   ;; Returns #t if all tests pass.
   (define (run-scenarios ss)
@@ -183,19 +197,31 @@
 
   ;;-----------------------------------------------
 
-  ;; FIXME: don't hard code this
-  (define tools-version "0.7.3")
+  (define tools-version
+          (chomp
+            (with-input-from-file "../VERSION"
+                                  (lambda ()
+                                    (get-line (current-input-port))))))
 
-  (define (tool-name sym)
+  ;;-----------------------------------------------
+  ;; A 'tool' is a function that builds up a command line.  This can then be
+  ;; passed to the functions in the (process) library.
+  (define (tool-path sym)
     (define (to-underscore c)
       (if (eq? #\- c) #\_ c))
 
-    (list->string (map to-underscore (string->list (symbol->string sym)))))
+    (string-append "../bin/"
+                   (list->string
+                     (map to-underscore
+                          (string->list
+                            (symbol->string sym))))))
 
   (define-syntax define-tool
     (syntax-rules ()
-      ((_ tool-sym) (define (tool-sym . flags)
-                      (apply run-ok (tool-name 'tool-sym) flags)))))
+      ((_ sym) (define sym
+                 (let ((path (tool-path 'sym)))
+                  (lambda args
+                    (build-command-line (cons path args))))))))
 
   (define (assert-equal str1 str2)
     (unless (equal? str1 str2)
@@ -239,5 +265,30 @@
         (unless (all-zeroes? (block-data b) 4096)
                 (fail "superblock contains non-zero data")))))
 
+  (define (assert-member? x xs)
+    (unless (member x xs)
+      (fail (fmt #f "expected " (wrt x) "to be a member of " (wrt xs)))))
+
+  (define (assert-raises-thunk thunk)
+    (call/cc
+      (lambda (k)
+        (with-exception-handler
+          (lambda (x)
+            (if (error? x)
+                (k #f)
+                (raise x)))
+          thunk)
+        (fail "expected an exception to be raised"))))
+
+  (define-syntax assert-raises
+    (syntax-rules ()
+      ((_ b1 b2 ...)
+       (assert-raises-thunk
+         (lambda ()
+           b1 b2 ...)))))
+
+  (define (assert-every pred . args)
+    (unless (apply every pred args)
+      (fail "assert-every failed")))
   )
 

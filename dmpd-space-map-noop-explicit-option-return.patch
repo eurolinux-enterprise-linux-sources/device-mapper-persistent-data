@@ -1,0 +1,28 @@
+From 2d45ae3ca1dbd6ab04b8b99f627555c0092e7d4e Mon Sep 17 00:00:00 2001
+From: Joe Thornber <ejt@redhat.com>
+Date: Wed, 5 Jun 2019 11:07:28 +0100
+Subject: [PATCH] [space-map/noop] Be explicit about returning an optional
+
+Needed for older version of g++
+
+(cherry picked from commit 5e5409f48b5403d2c6dffd9919b35ad77d6fb7b4)
+---
+ persistent-data/space-maps/noop.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/persistent-data/space-maps/noop.h b/persistent-data/space-maps/noop.h
+index 500dae8..6f71290 100644
+--- a/persistent-data/space-maps/noop.h
++++ b/persistent-data/space-maps/noop.h
+@@ -61,7 +61,7 @@ namespace persistent_data {
+ 
+ 		maybe_block find_free(span_iterator &it) {
+ 			fail();
+-			return 0;
++			return boost::optional<block_address>(0);
+ 		}
+ 
+ 		bool count_possibly_greater_than_one(block_address b) const {
+-- 
+1.8.3.1
+

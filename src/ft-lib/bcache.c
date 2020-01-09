@@ -8,26 +8,38 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <stdint.h>
 #include <libaio.h>
 #include <unistd.h>
 #include <linux/fs.h>
 #include <sys/ioctl.h>
+#include <stdarg.h>
 
 #include "list.h"
 #include "bcache.h"
 
 //----------------------------------------------------------------
 
-static void warn(const char *msg)
+static void warn(const char *fmt, ...)
 {
-	fprintf(stderr, "%s\n", msg);
+	va_list ap;
+
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
+
+	fprintf(stderr, "\n");
 }
 
 // FIXME: raise a condition somehow?
-static void raise(const char *msg)
+static void raise(const char *fmt, ...)
 {
-	warn(msg);
+	va_list ap;
+
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
+
+	fprintf(stderr, "\n");
 	exit(1);
 }
 
@@ -37,6 +49,9 @@ static void raise(const char *msg)
 static inline struct list_head *list_pop(struct list_head *head)
 {
 	struct list_head *l;
+
+	if (head->next == head)
+		raise("list is empty\n");
 
 	l = head->next;
 	list_del(l);
@@ -444,8 +459,10 @@ static void exit_free_list(struct bcache *cache)
 
 static struct block *alloc_block(struct bcache *cache)
 {
-	struct block *b = container_of(list_pop(&cache->free), struct block, list);
-	return b;
+	if (list_empty(&cache->free))
+		return NULL;
+
+	return container_of(list_pop(&cache->free), struct block, list);
 }
 
 /*----------------------------------------------------------------
@@ -606,7 +623,7 @@ static struct block *new_block(struct bcache *cache, block_address index)
 	struct block *b;
 
 	b = alloc_block(cache);
-	while (!b && cache->nr_locked < cache->nr_cache_blocks) {
+	while (!b && (cache->nr_locked < cache->nr_cache_blocks)) {
 		b = find_unused_clean_block(cache);
 		if (!b) {
 			if (list_empty(&cache->io_pending))
@@ -718,7 +735,7 @@ struct bcache *bcache_simple(const char *path, unsigned nr_cache_blocks)
 void bcache_destroy(struct bcache *cache)
 {
 	if (cache->nr_locked)
-		warn("some blocks are still locked\n");
+		warn("%u blocks are still locked\n", cache->nr_locked);
 
 	flush_cache(cache);
 	wait_all(cache);
@@ -734,7 +751,9 @@ void bcache_destroy(struct bcache *cache)
 static void check_index(struct bcache *cache, block_address index)
 {
 	if (index >= cache->nr_data_blocks)
-		raise("block out of bounds");
+		raise("block out of bounds (%llu >= %llu)",
+		      (unsigned long long) index,
+		      (unsigned long long) cache->nr_data_blocks);
 }
 
 uint64_t get_nr_blocks(struct bcache *cache)

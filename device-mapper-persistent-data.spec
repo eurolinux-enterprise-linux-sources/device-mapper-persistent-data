@@ -4,15 +4,15 @@
 
 Summary: Device-mapper Persistent Data Tools
 Name: device-mapper-persistent-data
-Version: 0.7.3
-Release: 3%{?dist}
+Version: 0.8.5
+Release: 1%{?dist}
 License: GPLv3+
 Group: System Environment/Base
 URL: https://github.com/jthornber/thin-provisioning-tools
 #Source0: https://github.com/jthornber/thin-provisioning-tools/archive/thin-provisioning-tools-% {version}.tar.gz
 Source0: https://github.com/jthornber/thin-provisioning-tools/archive/v%{version}.tar.gz
 Patch0: device-mapper-persistent-data-avoid-strip.patch
-Patch1: device-mapper-persistent-data-cache_restore-v2-dirty-bitset.patch
+Patch1: dmpd-space-map-noop-explicit-option-return.patch
 
 BuildRequires: autoconf, expat-devel, libaio-devel, libstdc++-devel, boost-devel
 Requires: expat
@@ -28,7 +28,7 @@ snapshot eras
 %prep
 %setup -q -n thin-provisioning-tools-%{version}
 %patch0 -p1 -b .avoid_strip
-%patch1 -p1 -b .v2_dirty_bitset
+%patch1 -p1 -b .explicit_option_return
 echo %{version}-%{release} > VERSION
 
 %build
@@ -84,6 +84,15 @@ make DESTDIR=%{buildroot} MANDIR=%{_mandir} install
 %{_sbindir}/thin_trim
 
 %changelog
+* Mon Jun 10 2019 Marian Csontos <mcsontos@redhat.com> - 0.8.5-1
+- Additional fixes for thin_dump and thin_repair.
+
+* Mon May 27 2019 Marian Csontos <mcsontos@redhat.com> - 0.8.2-1
+- Fix tools requiring additional --repair option.
+
+* Sat May 04 2019 Marian Csontos <mcsontos@redhat.com> - 0.8.1-1
+- Update to latest upstream release including various bug fixes.
+
 * Tue Nov 14 2017 Marian Csontos <mcsontos@redhat.com> - 0.7.3-3
 - Fix version 2 metadata corruption in cache_restore.
 

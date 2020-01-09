@@ -1,11 +1,15 @@
 (library
   (process)
 
-  (export run
+  (export build-command-line
+          run
           run-ok
-          run-fail)
+          run-fail
+          run-ok-rcv
+          run-fail-rcv)
 
   (import (chezscheme)
+          (fail)
           (fmt fmt)
           (logging)
           (list-utils)
@@ -18,11 +22,6 @@
   ;;; Ideally we'd use open-process-ports, but that loses us the exit code which
   ;;; we need for testing.  So we use system, and redirect stderr and stdout to
   ;;; temporary files, and subsequently read them in.  Messy, but fine for tests.
-
-  (define (fail msg)
-    (raise (condition
-             (make-error)
-             (make-message-condition msg))))
 
   (define (build-command-line cmd-and-args)
     (apply fmt #f (map dsp (intersperse " " cmd-and-args))))
@@ -62,5 +61,18 @@
                                (or (= 139 x)
                                    (zero? x))))
 
-    (run-with-exit-code fails? cmd-and-args)))
+    (run-with-exit-code fails? cmd-and-args))
+
+  (define-syntax run-ok-rcv
+    (syntax-rules ()
+      ((_ (stdout stderr) cmd b1 b2 ...)
+       (receive (stdout stderr) (run-ok cmd)
+                b1 b2 ...))))
+
+  (define-syntax run-fail-rcv
+    (syntax-rules ()
+      ((_ (stdout stderr) cmd b1 b2 ...)
+       (receive (stdout stderr) (run-fail cmd)
+                b1 b2 ...))))
+  )
 

@@ -18,6 +18,7 @@ There are more requirements for testing, detailed below.
 Building
 ========
 
+    autoconf
     ./configure
     make
     sudo make install
@@ -67,7 +68,7 @@ Alternatively you can go via the xml format (perhaps you want to
 inspect the repaired metadata before restoring).
 
     thin_dump --repair /dev/mapper/my_metadata > repaired.xml
-    thinp_restore -i repaired.xml -o /dev/mapper/my_metadata
+    thin_restore -i repaired.xml -o /dev/mapper/my_metadata
 
 Development
 ===========
@@ -123,7 +124,7 @@ Then,
 
 Other command are help and list.
 
-The test framework places temporary files under /tmp/test-output/.  By default
+The test framework places temporary files under ./test-output/.  By default
 the tests tidy up after themselves, just leaving a log file for each test.  You
 can turn this off by using the --disable-unlink flag if you want all the
 artifacts left.
