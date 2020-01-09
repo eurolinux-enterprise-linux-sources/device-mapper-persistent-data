@@ -8,7 +8,7 @@
 Summary: Device-mapper Persistent Data Tools
 Name: device-mapper-persistent-data
 Version: 0.7.0
-Release: 0.1.%{pre_release}%{?dist}
+Release: 0.1.%{pre_release}%{?dist}.1
 License: GPLv3+
 Group: System Environment/Base
 URL: https://github.com/jthornber/thin-provisioning-tools
@@ -17,6 +17,10 @@ Source0: https://github.com/jthornber/thin-provisioning-tools/archive/thin-provi
 Patch0: device-mapper-persistent-data-document-clear-needs-check-flag.patch
 Patch1: device-mapper-persistent-data-add-era_restore-and-cache_metadata_size-man-pages.patch
 Patch2: device-mapper-persistent-data-avoid-strip.patch
+# Commit: 4da8d19f296a9
+Patch3: device-mapper-persistent-data-cache_restore-fix-metadata-version-and-clean-shutdown.patch
+# Commit: e3b7d825696c2
+Patch4: device-mapper-persistent-data-cache_restore-v2-dirty-bitset-root-not-written.patch
 
 BuildRequires: autoconf, expat-devel, libaio-devel, libstdc++-devel, boost-devel
 Requires: expat
@@ -34,6 +38,8 @@ snapshot eras
 %patch0 -p1 -b .clear_needs_check_flag
 %patch1 -p1 -b .man_pages
 %patch2 -p1 -b .avoid_strip
+%patch3 -p1 -b .fix_flags
+%patch4 -p1 -b .v2_dirty_bitset_root
 echo %{version}-%{release} > VERSION
 
 %build
@@ -88,6 +94,9 @@ make DESTDIR=%{buildroot} MANDIR=%{_mandir} install
 %{_sbindir}/thin_show_duplicates
 
 %changelog
+* Mon Nov 20 2017 Marian Csontos <mcsontos@redhat.com> - 0.7.0-0.1-rc6.el7_4.1
+- Fix v2 metadata corruption in cache_restore.
+
 * Mon Mar 27 2017 Peter Rajnoha <prajnoha@redhat.com> - 0.7.0-0.1-rc6
 - Don't open devices as writeable if --clear-needs-check-flag is not set.
 - Fix cache metadata format version 2 superblock packing.

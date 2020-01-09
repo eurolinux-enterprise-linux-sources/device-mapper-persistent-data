@@ -1,0 +1,58 @@
+ caching/cache_restore.cc   | 5 +++--
+ caching/restore_emitter.cc | 4 ++--
+ caching/restore_emitter.h  | 8 +++++++-
+ 3 files changed, 12 insertions(+), 5 deletions(-)
+
+diff --git a/caching/cache_restore.cc b/caching/cache_restore.cc
+index f62306d..e430c11 100644
+--- a/caching/cache_restore.cc
++++ b/caching/cache_restore.cc
+@@ -69,8 +69,9 @@ namespace {
+ 		try {
+ 			block_manager<>::ptr bm = open_bm(*fs.output, block_manager<>::READ_WRITE);
+ 			metadata::ptr md(new metadata(bm, metadata::CREATE));
+-			emitter::ptr restorer = create_restore_emitter(md, fs.clean_shutdown,
+-								       fs.metadata_version);
++			emitter::ptr restorer = create_restore_emitter(md,
++								       fs.metadata_version,
++								       fs.clean_shutdown ? CLEAN_SHUTDOWN : NO_CLEAN_SHUTDOWN);
+ 
+ 			check_file_exists(*fs.input);
+ 			ifstream in(fs.input->c_str(), ifstream::in);
+diff --git a/caching/restore_emitter.cc b/caching/restore_emitter.cc
+index 34c5020..b7a573f 100644
+--- a/caching/restore_emitter.cc
++++ b/caching/restore_emitter.cc
+@@ -115,9 +115,9 @@ namespace {
+ 
+ emitter::ptr
+ caching::create_restore_emitter(metadata::ptr md, unsigned metadata_version,
+-				bool clean_shutdown)
++				shutdown_type st)
+ {
+-	return emitter::ptr(new restorer(md, clean_shutdown, metadata_version));
++	return emitter::ptr(new restorer(md, st == CLEAN_SHUTDOWN, metadata_version));
+ }
+ 
+ //----------------------------------------------------------------
+diff --git a/caching/restore_emitter.h b/caching/restore_emitter.h
+index 5c077af..a1d45d6 100644
+--- a/caching/restore_emitter.h
++++ b/caching/restore_emitter.h
+@@ -7,9 +7,15 @@
+ //----------------------------------------------------------------
+ 
+ namespace caching {
++
++	enum shutdown_type {
++		CLEAN_SHUTDOWN,
++		NO_CLEAN_SHUTDOWN
++	};
++
+ 	emitter::ptr create_restore_emitter(metadata::ptr md,
+ 					    unsigned metadata_version,
+-					    bool clean_shutdown = true);
++					    shutdown_type st = CLEAN_SHUTDOWN);
+ }
+ 
+ //----------------------------------------------------------------
