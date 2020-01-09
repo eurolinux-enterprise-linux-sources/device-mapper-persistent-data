@@ -8,7 +8,7 @@
 Summary: Device-mapper Persistent Data Tools
 Name: device-mapper-persistent-data
 Version: 0.6.2
-Release: 0.1.%{pre_release}%{?dist}
+Release: 0.2.%{pre_release}%{?dist}
 License: GPLv3+
 Group: System Environment/Base
 URL: https://github.com/jthornber/thin-provisioning-tools
@@ -17,6 +17,7 @@ Patch0: device-mapper-persistent-data-document-clear-needs-check-flag.patch
 Patch1: device-mapper-persistent-data-add-era_restore-and-cache_metadata_size-man-pages.patch
 Patch2: device-mapper-persistent-data-avoid-strip.patch
 Patch3: device-mapper-persistent-data-use-exec-prefix-for-sbin.patch
+Patch4: device-mapper-persistent-data-update-thin_dump-manpage.patch
 
 BuildRequires: autoconf, expat-devel, libaio-devel, libstdc++-devel, boost-devel
 Requires: expat
@@ -35,6 +36,7 @@ snapshot eras
 %patch1 -p1 -b .man_pages
 %patch2 -p1 -b .avoid_strip
 %patch3 -p1 -b .exec_prefix
+%patch4 -p1 -b .thin_dump_man
 
 echo %{version}-%{release} > VERSION
 
@@ -115,6 +117,9 @@ done
 %{_usrsbindir}/thin_trim
 
 %changelog
+* Tue Feb 20 2018 Marian Csontos <mcsontos@redhat.com> - 0.6.2-0.2.rc7
+- Fix usage of --metadata-snap in thin_dump manpage.
+
 * Tue Mar 22 2016 Peter Rajnoha <prajnoha@redhat.com> - 0.6.2-0.1.rc7
 - Fixes for thin_repair.
 - Add new fields to thin_ls: MAPPED_BYTES, EXCLUSIVE_BYTES and SHARED_BYTES.

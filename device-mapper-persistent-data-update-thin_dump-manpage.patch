@@ -1,0 +1,11 @@
+--- thin-provisioning-tools-0.6.2-rc7/man8/thin_dump.8.orig	2016-03-21 18:27:26.000000000 +0100
++++ thin-provisioning-tools-0.6.2-rc7/man8/thin_dump.8	2018-02-20 17:55:59.484238384 +0100
+@@ -32,7 +32,7 @@
+ .IP "\fB\-r, \-\-repair\fP".
+ Repair the metadata whilst dumping it.
+ 
+-.IP "\fB\-m, \-\-metadata\-snap\fP [block#]".
++.IP "\fB\-m, \-\-metadata\-snap\fP[=block#]".
+ Dump metadata snapshot created by device-mapper thin provisioning target.
+ If block is not provided, access the default metadata snapshot created by
+ the thin provisioning device-mapper target, else try the one at block#.
