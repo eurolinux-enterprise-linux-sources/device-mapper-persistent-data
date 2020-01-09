@@ -2,7 +2,6 @@
 #include "persistent-data/data-structures/bitset.h"
 #include "persistent-data/math_utils.h"
 
-using namespace boost;
 using namespace persistent_data;
 using namespace persistent_data::bitset_detail;
 using namespace std;
@@ -12,7 +11,7 @@ using namespace std;
 namespace {
 	struct bitset_traits {
 		typedef base::le64 disk_type;
-		typedef uint64_t value_type;
+		typedef ::uint64_t value_type;
 		typedef no_op_ref_counter<uint64_t> ref_counter;
 
 		static void unpack(disk_type const &disk, value_type &value) {
@@ -34,14 +33,14 @@ namespace persistent_data {
 			typedef boost::shared_ptr<bitset_impl> ptr;
 			typedef persistent_data::transaction_manager::ptr tm_ptr;
 
-			bitset_impl(tm_ptr tm)
+			bitset_impl(transaction_manager &tm)
 			: nr_bits_(0),
 			  array_(tm, rc_) {
 			}
 
-			bitset_impl(tm_ptr tm, block_address root, unsigned nr_bits)
+			bitset_impl(transaction_manager &tm, block_address root, unsigned nr_bits)
 				: nr_bits_(nr_bits),
-				  array_(tm, rc_, root, nr_bits / BITS_PER_ULL) {
+				  array_(tm, rc_, root, div_up<unsigned>(nr_bits, BITS_PER_ULL)) {
 			}
 
 			block_address get_root() const {
@@ -83,7 +82,7 @@ namespace persistent_data {
 			}
 
 			void walk_bitset(bitset_visitor &v) const {
-				bit_visitor vv(v);
+				bit_visitor vv(v, nr_bits_);
 				damage_visitor dv(v);
 				array_.visit_values(vv, dv);
 			}
@@ -91,18 +90,20 @@ namespace persistent_data {
 		private:
 			class bit_visitor {
 			public:
-				bit_visitor(bitset_visitor &v)
-				: v_(v) {
+				bit_visitor(bitset_visitor &v, unsigned nr_bits)
+					: v_(v),
+					  nr_bits_(nr_bits) {
 				}
 
 				void visit(uint32_t word_index, uint64_t word) {
 					uint32_t bit_index = word_index * 64;
-					for (unsigned bit = 0; bit < 64; bit++, bit_index++)
-						v_.visit(bit_index, !!(word & (1 << bit)));
+					for (unsigned bit = 0; bit < 64 && bit_index < nr_bits_; bit++, bit_index++)
+						v_.visit(bit_index, !!(word & (1ULL << bit)));
 				}
 
 			private:
 				bitset_visitor &v_;
+				unsigned nr_bits_;
 			};
 
 			class damage_visitor {
@@ -118,11 +119,11 @@ namespace persistent_data {
 				}
 
 			private:
-				optional<uint32_t> lifted_mult64(optional<uint32_t> const &m) {
+				boost::optional<uint32_t> lifted_mult64(boost::optional<uint32_t> const &m) {
 					if (!m)
 						return m;
 
-					return optional<uint32_t>(*m * 64);
+					return boost::optional<uint32_t>(*m * 64);
 				}
 
 				bitset_visitor &v_;
@@ -204,12 +205,12 @@ namespace persistent_data {
 
 //----------------------------------------------------------------
 
-persistent_data::bitset::bitset(tm_ptr tm)
+persistent_data::bitset::bitset(transaction_manager &tm)
 	: impl_(new bitset_impl(tm))
 {
 }
 
-persistent_data::bitset::bitset(tm_ptr tm, block_address root, unsigned nr_bits)
+persistent_data::bitset::bitset(transaction_manager &tm, block_address root, unsigned nr_bits)
 	: impl_(new bitset_impl(tm, root, nr_bits))
 {
 }

@@ -2,6 +2,7 @@
 #include <getopt.h>
 #include <libgen.h>
 
+#include "caching/commands.h"
 #include "caching/metadata.h"
 #include "caching/metadata_dump.h"
 #include "caching/restore_emitter.h"
@@ -16,12 +17,12 @@ using namespace caching;
 
 namespace {
 	metadata::ptr open_metadata_for_read(string const &path) {
-		block_manager<>::ptr bm = open_bm(path, block_io<>::READ_ONLY);
+		block_manager<>::ptr bm = open_bm(path, block_manager<>::READ_ONLY);
 		return metadata::ptr(new metadata(bm, metadata::OPEN));
 	}
 
 	emitter::ptr output_emitter(string const &path) {
-		block_manager<>::ptr bm = open_bm(path, block_io<>::READ_WRITE);
+		block_manager<>::ptr bm = open_bm(path, block_manager<>::READ_WRITE);
 		metadata::ptr md(new metadata(bm, metadata::CREATE));
 		return create_restore_emitter(md, true);
 	}
@@ -39,20 +40,28 @@ namespace {
 
 		return 0;
 	}
-
-	void usage(ostream &out, string const &cmd) {
-		out << "Usage: " << cmd << " [options] {device|file}" << endl
-		    << "Options:" << endl
-		    << "  {-h|--help}" << endl
-		    << "  {-i|--input} <input metadata (binary format)>" << endl
-		    << "  {-o|--output} <output metadata (binary format)>" << endl
-		    << "  {-V|--version}" << endl;
-	}
 }
 
 //----------------------------------------------------------------
 
-int main(int argc, char **argv)
+cache_repair_cmd::cache_repair_cmd()
+	: command("cache_repair")
+{
+}
+
+void
+cache_repair_cmd::usage(std::ostream &out) const
+{
+	out << "Usage: " << get_name() << " [options] {device|file}" << endl
+	    << "Options:" << endl
+	    << "  {-h|--help}" << endl
+	    << "  {-i|--input} <input metadata (binary format)>" << endl
+	    << "  {-o|--output} <output metadata (binary format)>" << endl
+	    << "  {-V|--version}" << endl;
+}
+
+int
+cache_repair_cmd::run(int argc, char **argv)
 {
 	int c;
 	boost::optional<string> input_path, output_path;
@@ -69,7 +78,7 @@ int main(int argc, char **argv)
 	while ((c = getopt_long(argc, argv, shortopts, longopts, NULL)) != -1) {
 		switch(c) {
 		case 'h':
-			usage(cout, basename(argv[0]));
+			usage(cout);
 			return 0;
 
 		case 'i':
@@ -85,20 +94,20 @@ int main(int argc, char **argv)
 			return 0;
 
 		default:
-			usage(cerr, basename(argv[0]));
+			usage(cerr);
 			return 1;
 		}
 	}
 
 	if (!input_path) {
 		cerr << "no input file provided" << endl;
-		usage(cerr, basename(argv[0]));
+		usage(cerr);
 		return 1;
 	}
 
 	if (!output_path) {
 		cerr << "no output file provided" << endl;
-		usage(cerr, basename(argv[0]));
+		usage(cerr);
 		return 1;
 	}
 

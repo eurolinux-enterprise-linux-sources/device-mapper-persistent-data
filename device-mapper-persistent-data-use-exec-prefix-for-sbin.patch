@@ -1,0 +1,17 @@
+ Makefile.in | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/Makefile.in b/Makefile.in
+index 46e91fd..98cb167 100644
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -121,7 +121,8 @@ endif
+ 
+ INSTALL:=@INSTALL@
+ PREFIX:=@prefix@
+-BINDIR:=$(DESTDIR)$(PREFIX)/sbin
++EXEC_PREFIX=@exec_prefix@
++BINDIR:=$(DESTDIR)$(EXEC_PREFIX)/sbin
+ DATADIR:=$(DESTDIR)$(PREFIX)/share
+ MANPATH:=$(DATADIR)/man
+ 

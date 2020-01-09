@@ -13,20 +13,31 @@ namespace era {
 	} __attribute__ ((packed));
 
 	struct era_detail {
+		era_detail()
+			: nr_bits(0),
+			  writeset_root(0) {
+		}
+
 		uint32_t nr_bits;
 		uint64_t writeset_root;
 	};
 
-	// FIXME: implement
 	struct era_detail_ref_counter {
-		era_detail_ref_counter(persistent_data::transaction_manager::ptr tm) {
+		era_detail_ref_counter(persistent_data::transaction_manager::ptr tm)
+			: tm_(tm) {
 		}
 
-		void inc(persistent_data::block_address b) {
+		void inc(era_detail const &d) {
+			tm_->get_sm()->inc(d.writeset_root);
 		}
 
 		void dec(persistent_data::block_address b) {
+			// I don't think we ever do this in the tools
+			throw std::runtime_error("not implemented");
 		}
+
+	private:
+		persistent_data::transaction_manager::ptr tm_;
 	};
 
 	struct era_detail_traits {

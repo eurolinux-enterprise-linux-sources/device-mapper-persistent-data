@@ -26,16 +26,21 @@
 
 namespace persistent_data {
 	checked_space_map::ptr
-	create_disk_sm(transaction_manager::ptr tm, block_address nr_blocks);
+	create_disk_sm(transaction_manager &tm, block_address nr_blocks);
 
 	checked_space_map::ptr
-	open_disk_sm(transaction_manager::ptr tm, void *root);
+	open_disk_sm(transaction_manager &tm, void *root);
 
 	checked_space_map::ptr
-	create_metadata_sm(transaction_manager::ptr tm, block_address nr_blocks);
+	create_metadata_sm(transaction_manager &tm, block_address nr_blocks);
 
 	checked_space_map::ptr
-	open_metadata_sm(transaction_manager::ptr tm, void *root);
+	open_metadata_sm(transaction_manager &tm, void *root);
+
+	// Get the number of data blocks with minimal IO.  Used when
+	// repairing to avoid the bulk of the space maps.
+	block_address
+	get_nr_blocks_in_data_sm(transaction_manager &tm, void *root);
 }
 
 //----------------------------------------------------------------

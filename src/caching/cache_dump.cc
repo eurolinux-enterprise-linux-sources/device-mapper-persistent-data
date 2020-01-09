@@ -4,6 +4,7 @@
 #include <iostream>
 
 #include "version.h"
+#include "caching/commands.h"
 #include "caching/mapping_array.h"
 #include "caching/metadata.h"
 #include "caching/metadata_dump.h"
@@ -34,7 +35,7 @@ namespace {
 
 	int dump(string const &dev, string const &output, flags const &fs) {
 		try {
-			block_manager<>::ptr bm = open_bm(dev, block_io<>::READ_ONLY);
+			block_manager<>::ptr bm = open_bm(dev, block_manager<>::READ_ONLY);
 			metadata::ptr md(new metadata(bm, metadata::OPEN));
 
 			if (want_stdout(output)) {
@@ -53,20 +54,28 @@ namespace {
 
 		return 0;
 	}
-
-	void usage(ostream &out, string const &cmd) {
-		out << "Usage: " << cmd << " [options] {device|file}" << endl
-		    << "Options:" << endl
-		    << "  {-h|--help}" << endl
-		    << "  {-o <xml file>}" << endl
-		    << "  {-V|--version}" << endl
-		    << "  {--repair}" << endl;
-	}
 }
 
 //----------------------------------------------------------------
 
-int main(int argc, char **argv)
+cache_dump_cmd::cache_dump_cmd()
+	: command("cache_dump")
+{
+}
+
+void
+cache_dump_cmd::usage(std::ostream &out) const
+{
+	out << "Usage: " << get_name() << " [options] {device|file}" << endl
+	    << "Options:" << endl
+	    << "  {-h|--help}" << endl
+	    << "  {-o <xml file>}" << endl
+	    << "  {-V|--version}" << endl
+	    << "  {--repair}" << endl;
+}
+
+int
+cache_dump_cmd::run(int argc, char **argv)
 {
 	int c;
 	flags fs;
@@ -88,7 +97,7 @@ int main(int argc, char **argv)
 			break;
 
 		case 'h':
-			usage(cout, basename(argv[0]));
+			usage(cout);
 			return 0;
 
 		case 'o':
@@ -100,14 +109,14 @@ int main(int argc, char **argv)
 			return 0;
 
 		default:
-			usage(cerr, basename(argv[0]));
+			usage(cerr);
 			return 1;
 		}
 	}
 
 	if (argc == optind) {
 		cerr << "No input file provided." << endl;
-		usage(cerr, basename(argv[0]));
+		usage(cerr);
 		return 1;
 	}
 

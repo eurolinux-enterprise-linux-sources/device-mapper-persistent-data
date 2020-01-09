@@ -19,11 +19,13 @@ namespace caching {
 	class superblock_flags {
 	public:
 		enum flag {
-			CLEAN_SHUTDOWN
+			CLEAN_SHUTDOWN,
+			NEEDS_CHECK
 		};
 
 		enum flag_bits {
-			CLEAN_SHUTDOWN_BIT = 0
+			CLEAN_SHUTDOWN_BIT = 0,
+			NEEDS_CHECK_BIT = 1,
 		};
 
 		superblock_flags();
@@ -128,7 +130,7 @@ namespace caching {
 
 	//--------------------------------
 
-	persistent_data::block_manager<>::validator::ptr superblock_validator();
+	bcache::validator::ptr superblock_validator();
 
 	superblock read_superblock(persistent_data::block_manager<>::ptr bm,
 				   persistent_data::block_address location = SUPERBLOCK_LOCATION);

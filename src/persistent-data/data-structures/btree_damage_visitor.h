@@ -70,10 +70,17 @@ namespace persistent_data {
 			}
 
 			maybe_run64 end() {
+				maybe_run64 r;
+
 				if (damaged_)
-					return maybe_run64(damage_begin_);
+					r = maybe_run64(damage_begin_);
 				else
-					return maybe_run64();
+					r = maybe_run64();
+
+				damaged_ = false;
+				damage_begin_ = 0;
+
+				return r;
 			}
 
 		private:
@@ -85,23 +92,31 @@ namespace persistent_data {
 		// different sub tree (by looking at the btree_path).
 		class path_tracker {
 		public:
+			path_tracker() {
+				// We push an empty path, to ensure there
+				// is always a current_path.
+				paths_.push_back(btree_path());
+			}
+
 			// returns the old path if the tree has changed.
-			boost::optional<btree_path> next_path(btree_path const &p) {
-				if (p != path_) {
-					btree_path tmp(path_);
-					path_ = p;
-					return boost::optional<btree_path>(tmp);
+			btree_path const *next_path(btree_path const &p) {
+				if (p != current_path()) {
+					if (paths_.size() == 2)
+						paths_.pop_front();
+					paths_.push_back(p);
+
+					return &paths_.front();
 				}
 
-				return boost::optional<btree_path>();
+				return NULL;
 			}
 
 			btree_path const &current_path() const {
-				return path_;
+				return paths_.back();
 			}
 
 		private:
-			btree_path path_;
+			std::list<btree_path> paths_;
 		};
 
 		//----------------------------------------------------------------
@@ -182,6 +197,7 @@ namespace persistent_data {
 
 			error_outcome error_accessing_node(node_location const &l, block_address b,
 							   std::string const &what) {
+				update_path(l.path);
 				report_damage(what);
 				return btree<Levels, ValueTraits>::visitor::EXCEPTION_HANDLED;
 			}
@@ -189,11 +205,12 @@ namespace persistent_data {
 		private:
 			void visit_values(btree_path const &path,
 					  node_ref<ValueTraits> const &n) {
+				btree_path p2(path);
 				unsigned nr = n.get_nr_entries();
 				for (unsigned i = 0; i < nr; i++) {
-					btree_path p2(path);
 					p2.push_back(n.key_at(i));
 					value_visitor_.visit(p2, n.value_at(i));
+					p2.pop_back();
 				}
 			}
 
@@ -201,6 +218,7 @@ namespace persistent_data {
 					    btree_detail::node_ref<block_traits> const &n) {
 				if (!already_visited(n) &&
 				    check_block_nr(n) &&
+				    check_value_size(n) &&
 				    check_max_entries(n) &&
 				    check_nr_entries(n, loc.is_sub_root()) &&
 				    check_ordered_keys(n) &&
@@ -220,6 +238,7 @@ namespace persistent_data {
 					btree_detail::node_ref<ValueTraits2> const &n) {
 				if (!already_visited(n) &&
 				    check_block_nr(n) &&
+				    check_value_size(n) &&
 				    check_max_entries(n) &&
 				    check_nr_entries(n, loc.is_sub_root()) &&
 				    check_ordered_keys(n) &&
@@ -260,6 +279,16 @@ namespace persistent_data {
 					    << ", claims " << n.get_block_nr();
 
 					report_damage(out.str());
+					return false;
+				}
+
+				return true;
+			}
+
+			template <typename node>
+			bool check_value_size(node const &n) {
+				if (!n.value_sizes_match()) {
+					report_damage(n.value_mismatch_string());
 					return false;
 				}
 
@@ -427,7 +456,7 @@ namespace persistent_data {
 			}
 
 			void update_path(btree_path const &path) {
-				boost::optional<btree_path> old_path = path_tracker_.next_path(path);
+				btree_path const *old_path = path_tracker_.next_path(path);
 				if (old_path)
 					// we need to emit any errors that
 					// were accrued against the old

@@ -19,6 +19,8 @@
 #include "persistent-data/space-maps/recursive.h"
 #include "persistent-data/space-maps/subtracting_span_iterator.h"
 
+#include <list>
+
 using namespace persistent_data;
 
 //----------------------------------------------------------------
@@ -176,6 +178,10 @@ namespace {
 			sm_->iterate(it);
 		}
 
+		virtual void count_metadata(block_counter &bc) const {
+			sm_->count_metadata(bc);
+		}
+
 		virtual size_t root_size() const {
 			cant_recurse("root_size");
 			recursing_const_lock lock(*this);
@@ -286,7 +292,7 @@ namespace {
 			BOP_SET
 		};
 
-		typedef map<block_address, list<block_op> > op_map;
+		typedef map<block_address, std::list<block_op> > op_map;
 		op_map ops_;
 
 		subtracting_span_iterator::block_set allocated_blocks_;

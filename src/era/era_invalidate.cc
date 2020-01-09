@@ -5,6 +5,7 @@
 
 #include "version.h"
 #include "base/indented_stream.h"
+#include "era/commands.h"
 #include "era/era_array.h"
 #include "era/writeset_tree.h"
 #include "era/metadata.h"
@@ -87,9 +88,14 @@ namespace {
 		walk_writeset_tree(md.tm_, *md.writeset_tree_, v, dv);
 	}
 
-	void mark_blocks_since(metadata const &md, uint32_t threshold, set<uint32_t> &result) {
-		walk_array(*md.era_array_, md.sb_.nr_blocks, threshold, result);
-		walk_writesets(md, threshold, result);
+	void mark_blocks_since(metadata const &md, optional<uint32_t> const &threshold, set<uint32_t> &result) {
+		if (!threshold)
+			// Can't get here, just putting in to pacify the compiler
+			throw std::runtime_error("threshold not set");
+		else {
+			walk_array(*md.era_array_, md.sb_.nr_blocks, *threshold, result);
+			walk_writesets(md, *threshold, result);
+		}
 	}
 
 	//--------------------------------
@@ -146,7 +152,7 @@ namespace {
 	int invalidate(string const &dev, string const &output, flags const &fs) {
 		try {
 			set<uint32_t> blocks;
-			block_manager<>::ptr bm = open_bm(dev, block_io<>::READ_ONLY);
+			block_manager<>::ptr bm = open_bm(dev, block_manager<>::READ_ONLY, !fs.metadata_snapshot_);
 
 			if (fs.metadata_snapshot_) {
 				superblock sb = read_superblock(bm);
@@ -154,11 +160,11 @@ namespace {
 					throw runtime_error("no metadata snapshot taken.");
 
 				metadata::ptr md(new metadata(bm, *sb.metadata_snap));
-				mark_blocks_since(*md, *fs.era_threshold_, blocks);
+				mark_blocks_since(*md, fs.era_threshold_, blocks);
 
 			} else {
 				metadata::ptr md(new metadata(bm, metadata::OPEN));
-				mark_blocks_since(*md, *fs.era_threshold_, blocks);
+				mark_blocks_since(*md, fs.era_threshold_, blocks);
 			}
 
 			if (want_stdout(output))
@@ -176,19 +182,28 @@ namespace {
 
 		return 0;
 	}
-
-	void usage(ostream &out, string const &cmd) {
-		out << "Usage: " << cmd << " [options] --written-since <era> {device|file}" << endl
-		    << "Options:" << endl
-		    << "  {-h|--help}" << endl
-		    << "  {-o <xml file>}" << endl
-		    << "  {-V|--version}" << endl;
-	}
 }
 
 //----------------------------------------------------------------
 
-int main(int argc, char **argv)
+era_invalidate_cmd::era_invalidate_cmd()
+	: command("era_invalidate")
+{
+}
+
+void
+era_invalidate_cmd::usage(std::ostream &out) const
+{
+	out << "Usage: " << get_name() << " [options] --written-since <era> {device|file}\n"
+	    << "Options:\n"
+	    << "  {-h|--help}\n"
+	    << "  {-o <xml file>}\n"
+	    << "  {--metadata-snapshot}\n"
+	    << "  {-V|--version}" << endl;
+}
+
+int
+era_invalidate_cmd::run(int argc, char **argv)
 {
 	int c;
 	flags fs;
@@ -215,7 +230,7 @@ int main(int argc, char **argv)
 			break;
 
 		case 'h':
-			usage(cout, basename(argv[0]));
+			usage(cout);
 			return 0;
 
 		case 'o':
@@ -227,20 +242,20 @@ int main(int argc, char **argv)
 			return 0;
 
 		default:
-			usage(cerr, basename(argv[0]));
+			usage(cerr);
 			return 1;
 		}
 	}
 
 	if (argc == optind) {
 		cerr << "No input file provided." << endl;
-		usage(cerr, basename(argv[0]));
+		usage(cerr);
 		return 1;
 	}
 
 	if (!fs.era_threshold_) {
 		cerr << "Please specify --written-since" << endl;
-		usage(cerr, basename(argv[0]));
+		usage(cerr);
 		return 1;
 	}
 

@@ -41,6 +41,26 @@ AC_PROG_LN_S
 AC_PROG_MAKE_SET
 AC_PROG_MKDIR_P
 AC_PROG_INSTALL
+AC_DEFUN([AC_PROG_STRIP], [AC_CHECK_TOOL(STRIP, strip, :)])
+AC_PROG_STRIP
+AC_ARG_VAR(STRIP, [Command for discarding symbols from object files])
+
+################################################################
+dnl -- Check for large file support
+AC_SYS_LARGEFILE
+if test x$ac_cv_sys_file_offset_bits = x64; then
+    LFS_FLAGS+="-D_FILE_OFFSET_BITS=64"
+fi
+if test x$ac_cv_sys_large_files = x1; then
+    LFS_FLAGS+="-D_LARGE_FILES"
+fi
+
+################################################################
+dnl -- Checks for functions.
+AC_FUNC_STRERROR_R
+if test x$ac_cv_func_strerror_r_char_p = xyes; then
+   CXX_STRERROR_FLAG="-DSTRERROR_R_CHAR_P"
+fi
 
 ################################################################################
 dnl -- Prefix is /usr by default, the exec_prefix default is setup later
@@ -48,10 +68,9 @@ AC_PREFIX_DEFAULT(/usr)
 
 AC_CHECK_HEADERS([expat.h \
 	          iostream \
+		  libaio.h \
 	          boost/bind.hpp \
 		  boost/crc.hpp \
-		  boost/intrusive/circular_list_algorithms.hpp \
-		  boost/intrusive/rbtree_algorithms.hpp \
 		  boost/lexical_cast.hpp \
 		  boost/noncopyable.hpp \
 		  boost/optional.hpp \
@@ -119,6 +138,14 @@ AC_ARG_ENABLE(testing,
 AC_MSG_RESULT($TESTING)
 
 ################################################################################
+dnl -- Enable static libstdc++
+AC_MSG_CHECKING(whether to statically link libstdc++)
+AC_ARG_ENABLE(static_cxx,
+              AC_HELP_STRING(--enable-static-cxx, [enable static link of libstdc++]),
+              STATIC_CXX=$enableval, STATIC_CXX=no)
+AC_MSG_RESULT($STATIC_CXX)
+
+################################################################################
 dnl -- Check for getopt
 AC_CHECK_HEADERS(getopt.h, AC_DEFINE([HAVE_GETOPTLONG], 1, [Define to 1 if getopt_long is available.]))
 
@@ -137,12 +164,15 @@ VERSION_PATCHLEVEL=`echo "$VER" | $AWK -F '[[(.]]' '{print $3}'`
 ################################################################
 AC_SUBST(CXXDEBUG_FLAG)
 AC_SUBST(CXXOPTIMISE_FLAG)
+AC_SUBST(CXX_STRERROR_FLAG)
+AC_SUBST(LFS_FLAGS)
 AC_SUBST(INSTALL)
 AC_SUBST(prefix)
 AC_SUBST(RELEASE_DATE)
 AC_SUBST(RELEASE_DATE)
 AC_SUBST(TESTING)
 AC_SUBST(THIN_PROVISIONING_TOOLS_VERSION)
+AC_SUBST(STATIC_CXX)
 
 ################################################################################
 dnl -- First and last lines should not contain files to generate in order to

@@ -1,14 +1,15 @@
-#include "base/base64.h"
-#include "base/indented_stream.h"
 #include "caching/xml_format.h"
 
-#include <boost/lexical_cast.hpp>
-#include <expat.h>
+#include "base/base64.h"
+#include "base/indented_stream.h"
+#include "base/xml_utils.h"
 
-using namespace boost;
+#include <boost/lexical_cast.hpp>
+
 using namespace caching;
 using namespace persistent_data;
 using namespace std;
+using namespace xml_utils;
 
 //----------------------------------------------------------------
 
@@ -117,49 +118,6 @@ namespace {
 	//--------------------------------
 	// Parser
 	//--------------------------------
-
-	// FIXME: factor out common code with thinp one
-	typedef std::map<string, string> attributes;
-
-	void build_attributes(attributes &a, char const **attr) {
-		while (*attr) {
-			char const *key = *attr;
-
-			attr++;
-			if (!*attr) {
-				ostringstream out;
-				out << "No value given for xml attribute: " << key;
-				throw runtime_error(out.str());
-			}
-
-			char const *value = *attr;
-			a.insert(make_pair(string(key), string(value)));
-			attr++;
-		}
-	}
-
-	template <typename T>
-	T get_attr(attributes const &attr, string const &key) {
-		attributes::const_iterator it = attr.find(key);
-		if (it == attr.end()) {
-			ostringstream out;
-			out << "could not find attribute: " << key;
-			throw runtime_error(out.str());
-		}
-
-		return boost::lexical_cast<T>(it->second);
-	}
-
-	template <typename T>
-	boost::optional<T> get_opt_attr(attributes const &attr, string const &key) {
-		typedef boost::optional<T> rtype;
-		attributes::const_iterator it = attr.find(key);
-		if (it == attr.end())
-			return rtype();
-
-		return rtype(boost::lexical_cast<T>(it->second));
-	}
-
 	void parse_superblock(emitter *e, attributes const &attr) {
 		e->begin_superblock(get_attr<string>(attr, "uuid"),
 				    get_attr<uint64_t>(attr, "block_size"),
@@ -189,14 +147,14 @@ namespace {
 
 		block_address cblock = get_attr<uint64_t>(attr, "cache_block");
 		decoded_or_error doe = base64_decode(get_attr<string>(attr, "data"));
-		if (!get<vector<unsigned char> >(&doe)) {
+		if (!boost::get<vector<unsigned char> >(&doe)) {
 			ostringstream msg;
 			msg << "invalid base64 encoding of hint for cache block "
-			    << cblock << ": " << get<string>(doe);
+			    << cblock << ": " << boost::get<string>(doe);
 			throw runtime_error(msg.str());
 		}
 
-		e->hint(cblock, get<vector<unsigned char> >(doe));
+		e->hint(cblock, boost::get<vector<unsigned char> >(doe));
 	}
 
 	// FIXME: why passing e by ptr?
@@ -278,14 +236,15 @@ caching::create_xml_emitter(ostream &out)
 }
 
 void
-caching::parse_xml(istream &in, emitter::ptr e)
+caching::parse_xml(istream &in, emitter::ptr e,
+		   size_t input_length, base::progress_monitor &monitor)
 {
-	XML_Parser parser = XML_ParserCreate(NULL);
-	if (!parser)
-		throw runtime_error("couldn't create xml parser");
+	xml_parser p;
 
-	XML_SetUserData(parser, e.get());
-	XML_SetElementHandler(parser, start_tag, end_tag);
+	XML_SetUserData(p.get_parser(), e.get());
+	XML_SetElementHandler(p.get_parser(), start_tag, end_tag);
+
+	size_t total = 0;
 
 	while (!in.eof()) {
 		char buffer[4096];
@@ -293,17 +252,19 @@ caching::parse_xml(istream &in, emitter::ptr e)
 		size_t len = in.gcount();
 		int done = in.eof();
 
-		if (!XML_Parse(parser, buffer, len, done)) {
+		if (!XML_Parse(p.get_parser(), buffer, len, done)) {
 			ostringstream out;
 			out << "Parse error at line "
-			    << XML_GetCurrentLineNumber(parser)
+			    << XML_GetCurrentLineNumber(p.get_parser())
 			    << ":\n"
-			    << XML_ErrorString(XML_GetErrorCode(parser))
+			    << XML_ErrorString(XML_GetErrorCode(p.get_parser()))
 			    << endl;
 			throw runtime_error(out.str());
 		}
-	}
 
+		total += len;
+		monitor.update_percent(total * 100 / input_length);
+	}
 }
 
 //----------------------------------------------------------------

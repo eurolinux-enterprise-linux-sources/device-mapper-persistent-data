@@ -4,6 +4,7 @@
 #include <iostream>
 
 #include "version.h"
+#include "era/commands.h"
 #include "era/era_array.h"
 #include "era/writeset_tree.h"
 #include "era/metadata.h"
@@ -37,7 +38,7 @@ namespace {
 
 	int dump(string const &dev, string const &output, flags const &fs) {
 		try {
-			block_manager<>::ptr bm = open_bm(dev, block_io<>::READ_ONLY);
+			block_manager<>::ptr bm = open_bm(dev, block_manager<>::READ_ONLY);
 			metadata::ptr md(new metadata(bm, metadata::OPEN));
 
 			if (want_stdout(output)) {
@@ -56,21 +57,29 @@ namespace {
 
 		return 0;
 	}
-
-	void usage(ostream &out, string const &cmd) {
-		out << "Usage: " << cmd << " [options] {device|file}" << endl
-		    << "Options:" << endl
-		    << "  {-h|--help}" << endl
-		    << "  {-o <xml file>}" << endl
-		    << "  {-V|--version}" << endl
-		    << "  {--repair}" << endl
-		    << "  {--logical}" << endl;
-	}
 }
 
 //----------------------------------------------------------------
 
-int main(int argc, char **argv)
+era_dump_cmd::era_dump_cmd()
+	: command("era_dump")
+{
+}
+
+void
+era_dump_cmd::usage(std::ostream &out) const
+{
+	out << "Usage: " << get_name() << " [options] {device|file}" << endl
+	    << "Options:" << endl
+	    << "  {-h|--help}" << endl
+	    << "  {-o <xml file>}" << endl
+	    << "  {-V|--version}" << endl
+	    << "  {--repair}" << endl
+	    << "  {--logical}" << endl;
+}
+
+int
+era_dump_cmd::run(int argc, char **argv)
 {
 	int c;
 	flags fs;
@@ -97,7 +106,7 @@ int main(int argc, char **argv)
 			break;
 
 		case 'h':
-			usage(cout, basename(argv[0]));
+			usage(cout);
 			return 0;
 
 		case 'o':
@@ -109,14 +118,14 @@ int main(int argc, char **argv)
 			return 0;
 
 		default:
-			usage(cerr, basename(argv[0]));
+			usage(cerr);
 			return 1;
 		}
 	}
 
 	if (argc == optind) {
 		cerr << "No input file provided." << endl;
-		usage(cerr, basename(argv[0]));
+		usage(cerr);
 		return 1;
 	}
 

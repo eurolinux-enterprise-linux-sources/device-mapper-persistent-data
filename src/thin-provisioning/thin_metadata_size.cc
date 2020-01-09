@@ -23,6 +23,8 @@
  *
  */
 
+#include "thin-provisioning/commands.h"
+
 #include <getopt.h>
 #include <libgen.h>
 #include <math.h>
@@ -33,13 +35,20 @@
 
 #include <search.h>
 
+using namespace thin_provisioning;
+
 /*----------------------------------------------------------------*/
 
 enum numeric_options { BLOCKSIZE, POOLSIZE, MAXTHINS, NUMERIC, OPT_END};
 enum return_units { RETURN_BYTES, RETURN_SECTORS };
 enum numeric_type { NO_NUMBER, NUMBER, NUMBER_SHORT, NUMBER_LONG };
-typedef	unsigned bool;
-enum bool_value { false = 0, true = 1};
+
+struct options_ {
+	unsigned unit_idx;
+	char *s[OPT_END];
+	unsigned long long n[OPT_END];
+};
+
 struct global {
 	char *prg; /* program name */
 
@@ -51,11 +60,7 @@ struct global {
 	} unit;
 
 	/* Command line option properties. */
-	struct options {
-		unsigned unit_idx;
-		char *s[OPT_END];
-		unsigned long long n[OPT_END];
-	} options;
+	options_ options;
 };
 
 static void exit_prg(struct global *g, int ret)
@@ -80,7 +85,7 @@ static void abort_prg(struct global *g, const char *msg)
 	exit_prg(g, 1);
 }
 
-static int unit_index(struct global *g, char *unit_string)
+static int unit_index(struct global *g, char const *unit_string)
 {
 	unsigned len;
 
@@ -109,14 +114,14 @@ static int unit_index(struct global *g, char *unit_string)
 static struct global *init_prg(char *prg_path)
 {
 	unsigned u;
-	static char *unit_chars = "bskKmMgGtTpPeEzZyY";
-	static char *unit_strings[] = { "bytes", "sectors",
-					"kilobytes", "kibibytes", "megabytes",  "mebibytes",
-					"gigabytes", "gibibytes", "terabytes",  "tebibytes",
-					"petabytes", "pebibytes", "exabytes",   "ebibytes",
-					"zetabytes", "zebibytes", "yottabytes", "yobibytes", NULL };
+	static char const *unit_chars = "bskKmMgGtTpPeEzZyY";
+	static char const *unit_strings[] = { "bytes", "sectors",
+					      "kibibytes", "kilobytes", "mebibytes", "megabytes",
+					      "gibibytes", "gigabytes", "tebibytes", "terabytes",
+					      "pebibytes", "petabytes", "ebibytes",  "exabytes",
+					      "zebibytes", "zetabytes", "yobibytes", "yottabytes", NULL };
 	static unsigned long long unit_factors[ARRAY_SIZE(unit_strings) - 1] = { 1, 512, 1024, 1000 };
-	struct global *r = malloc(sizeof(*r));
+	struct global *r = static_cast<global *>(malloc(sizeof(*r)));
 
 	if (!r)
 		abort_prg(r, "failed to allocate global context!");
@@ -129,8 +134,8 @@ static struct global *init_prg(char *prg_path)
 	}
 
 	r->prg = basename(prg_path);
-	r->unit.chars = unit_chars;
-	r->unit.strings = unit_strings;
+	r->unit.chars = const_cast<char *>(unit_chars);
+	r->unit.strings = const_cast<char **>(unit_strings);
 	r->unit.factors = unit_factors;
 	r->options.unit_idx = unit_index(r, NULL);
 
@@ -144,7 +149,7 @@ static unsigned long long bytes_per_sector(struct global *g)
 
 static void check_opts(struct global *g)
 {
-	struct options *o = &g->options;
+	options_ *o = &g->options;
 
 	if (!o->n[BLOCKSIZE])
 		abort_prg(g, "block size required!");
@@ -183,7 +188,7 @@ static unsigned long long to_bytes(struct global *g, char *sz, enum return_units
 	return (!us || unit == RETURN_SECTORS) ? r / bytes_per_sector(g) : r;
 }
 
-static void printf_aligned(struct global *g, char *a, char *b, char *c, bool units, bool mandatory)
+static void printf_aligned(struct global *g, char const *a, char const *b, char const *c, bool units, bool mandatory)
 {
 	char buf[80];
 
@@ -254,7 +259,7 @@ static void check_size(struct global *g, enum numeric_options o, char *arg)
 		idx = g->options.unit_idx;
 	}
 
-	g->options.s[o] = malloc(strlen(arg) + strlen(g->unit.strings[idx]) + 1);
+	g->options.s[o] = static_cast<char *>(malloc(strlen(arg) + strlen(g->unit.strings[idx]) + 1));
 	if (!g->options.s[o])
 		abort_prg(g, "failed to allocate string!");
 
@@ -321,7 +326,7 @@ static const unsigned mappings_per_block(void)
 static void print_precision(struct global *g, double r, unsigned idx)
 {
 	bool full = g->options.n[NUMERIC] == NO_NUMBER;
-	double rtrunc = truncl(r);
+	double rtrunc = floor(r);
 
 	if (full)
 		printf("%s - ", g->prg);
@@ -359,7 +364,21 @@ static void print_estimated_result(struct global *g)
 	print_precision(g, r, g->options.unit_idx);
 }
 
-int main(int argc, char **argv)
+//----------------------------------------------------------------
+
+thin_metadata_size_cmd::thin_metadata_size_cmd()
+	: command("thin_metadata_size")
+{
+}
+
+void
+thin_metadata_size_cmd::usage(std::ostream &out) const
+{
+	// FIXME: finish
+}
+
+int
+thin_metadata_size_cmd::run(int argc, char **argv)
 {
 	struct global *g = init_prg(*argv);
 
@@ -368,3 +387,5 @@ int main(int argc, char **argv)
 	exit_prg(g, 0);
 	return 0; /* Doesn't get here... */
 }
+
+//----------------------------------------------------------------

@@ -40,6 +40,7 @@ Options:
   {-q|--quiet}
   {-h|--help}
   {-V|--version}
+  {--clear-needs-check-flag}
   {--super-block-only}
   {--skip-mappings}
   {--skip-hints}
@@ -80,9 +81,9 @@ end
 Given(/^valid cache metadata$/) do
   in_current_dir do
     system("cache_xml create --nr-cache-blocks uniform[1000..5000] --nr-mappings uniform[500..1000] > #{xml_file}")
+    system("dd if=/dev/zero of=#{dev_file} bs=4k count=1024 > /dev/null")
   end
 
-  run_simple("dd if=/dev/zero of=#{dev_file} bs=4k count=1024")
   run_simple("cache_restore -i #{xml_file} -o #{dev_file}")
 end
 
@@ -100,10 +101,10 @@ Given(/^an empty dev file$/) do
   run_simple("dd if=/dev/zero of=#{dev_file} bs=4k count=1024")
 end
 
-When(/^I cache_dump$/) do
+When(/^I cache dump$/) do
   run_simple("cache_dump #{dev_file} -o #{new_dump_file}", true)
 end
 
-When(/^I cache_restore$/) do
+When(/^I cache restore$/) do
   run_simple("cache_restore -i #{dump_files[-1]} -o #{dev_file}", true)
 end

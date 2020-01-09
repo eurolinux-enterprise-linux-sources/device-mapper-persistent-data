@@ -10,6 +10,7 @@
 #include "persistent-data/run.h"
 #include "persistent-data/space-maps/core.h"
 #include "persistent-data/file_utils.h"
+#include "thin-provisioning/commands.h"
 #include "thin-provisioning/superblock.h"
 #include "thin-provisioning/mapping_tree.h"
 #include "thin-provisioning/rmap_visitor.h"
@@ -23,7 +24,7 @@ namespace {
 	block_manager<>::ptr
 	open_bm(string const &path) {
 		block_address nr_blocks = get_nr_blocks(path);
-		block_io<>::mode m = block_io<>::READ_ONLY;
+		block_manager<>::mode m = block_manager<>::READ_ONLY;
 		return block_manager<>::ptr(new block_manager<>(path, nr_blocks, 1, m));
 	}
 
@@ -75,7 +76,7 @@ namespace {
 			transaction_manager::ptr tm = open_tm(bm);
 
 			superblock_detail::superblock sb = read_superblock(bm);
-			mapping_tree mtree(tm, sb.data_mapping_root_,
+			mapping_tree mtree(*tm, sb.data_mapping_root_,
 					   mapping_tree_detail::block_traits::ref_counter(tm->get_sm()));
 
 			btree_visit_values(mtree, rv, dv);
@@ -110,22 +111,30 @@ namespace {
 
 		return region(begin, end);
 	};
-
-	void usage(ostream &out, string const &cmd) {
-		out << "Usage: " << cmd << " [options] {device|file}" << endl
-		    << "Options:" << endl
-		    << "  {-h|--help}" << endl
-		    << "  {-V|--version}" << endl
-		    << "  {--region <block range>}*" << endl
-		    << "Where:" << endl
-		    << "  <block range> is of the form <begin>..<one-past-the-end>" << endl
-		    << "  for example 5..45 denotes blocks 5 to 44 inclusive, but not block 45" << endl;
-	}
 }
 
 //----------------------------------------------------------------
 
-int main(int argc, char **argv)
+thin_rmap_cmd::thin_rmap_cmd()
+	: command("thin_rmap")
+{
+}
+
+void
+thin_rmap_cmd::usage(std::ostream &out) const
+{
+	out << "Usage: " << get_name() << " [options] {device|file}" << endl
+	    << "Options:" << endl
+	    << "  {-h|--help}" << endl
+	    << "  {-V|--version}" << endl
+	    << "  {--region <block range>}*" << endl
+	    << "Where:" << endl
+	    << "  <block range> is of the form <begin>..<one-past-the-end>" << endl
+	    << "  for example 5..45 denotes blocks 5 to 44 inclusive, but not block 45" << endl;
+}
+
+int
+thin_rmap_cmd::run(int argc, char **argv)
 {
 	int c;
 	vector<region> regions;
@@ -140,7 +149,7 @@ int main(int argc, char **argv)
 	while ((c = getopt_long(argc, argv, shortopts, longopts, NULL)) != -1) {
 		switch (c) {
 		case 'h':
-			usage(cout, basename(argv[0]));
+			usage(cout);
 			return 0;
 
 		case 'V':
@@ -160,14 +169,14 @@ int main(int argc, char **argv)
 			break;
 
 		default:
-			usage(cerr, basename(argv[0]));
+			usage(cerr);
 			return 1;
 		}
 	}
 
 	if (argc == optind) {
 		cerr << "No input file provided." << endl;
-		usage(cerr, basename(argv[0]));
+		usage(cerr);
 		exit(1);
 	}
 

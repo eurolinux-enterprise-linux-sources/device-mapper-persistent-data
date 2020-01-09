@@ -4,7 +4,6 @@
 #include "persistent-data/errors.h"
 
 using namespace base;
-using namespace boost;
 using namespace era;
 using namespace superblock_damage;
 using namespace persistent_data;
@@ -149,8 +148,8 @@ superblock_traits::unpack(disk_type const &disk, value_type &value)
 
 	block_address ms = to_cpu<uint64_t>(disk.metadata_snap);
 	value.metadata_snap = (ms == SUPERBLOCK_LOCATION) ?
-		optional<block_address>() :
-		optional<block_address>(ms);
+		boost::optional<block_address>() :
+		boost::optional<block_address>(ms);
 }
 
 void
@@ -211,25 +210,25 @@ namespace era_validator {
 	uint32_t const SUPERBLOCK_CSUM_SEED = 146538381;
 
 	// FIXME: turn into a template, we have 3 similar classes now
-	struct sb_validator : public block_manager<>::validator {
-		virtual void check(buffer<> const &b, block_address location) const {
-			superblock_disk const *sbd = reinterpret_cast<superblock_disk const *>(&b);
+	struct sb_validator : public bcache::validator {
+		virtual void check(void const *raw, block_address location) const {
+			superblock_disk const *sbd = reinterpret_cast<superblock_disk const *>(raw);
 			crc32c sum(SUPERBLOCK_CSUM_SEED);
 			sum.append(&sbd->flags, MD_BLOCK_SIZE - sizeof(uint32_t));
 			if (sum.get_sum() != to_cpu<uint32_t>(sbd->csum))
 				throw checksum_error("bad checksum in superblock");
 		}
 
-		virtual void prepare(buffer<> &b, block_address location) const {
-			superblock_disk *sbd = reinterpret_cast<superblock_disk *>(&b);
+		virtual void prepare(void *raw, block_address location) const {
+			superblock_disk *sbd = reinterpret_cast<superblock_disk *>(raw);
 			crc32c sum(SUPERBLOCK_CSUM_SEED);
 			sum.append(&sbd->flags, MD_BLOCK_SIZE - sizeof(uint32_t));
 			sbd->csum = to_disk<base::le32>(sum.get_sum());
 		}
 	};
 
-	block_manager<>::validator::ptr  mk_v() {
-		return block_manager<>::validator::ptr(new sb_validator);
+	bcache::validator::ptr  mk_v() {
+		return bcache::validator::ptr(new sb_validator);
 	}
 }
 
@@ -240,7 +239,7 @@ era::read_superblock(block_manager<>::ptr bm, block_address location)
 {
 	superblock sb;
 	block_manager<>::read_ref r = bm->read_lock(location, era_validator::mk_v());
-	superblock_disk const *sbd = reinterpret_cast<superblock_disk const *>(&r.data());
+	superblock_disk const *sbd = reinterpret_cast<superblock_disk const *>(r.data());
 	superblock_traits::unpack(*sbd, sb);
 
 	return sb;
@@ -250,7 +249,7 @@ void
 era::write_superblock(block_manager<>::ptr bm, superblock const &sb, block_address location)
 {
 	block_manager<>::write_ref w = bm->superblock_zero(location, era_validator::mk_v());
-	superblock_traits::pack(sb, *reinterpret_cast<superblock_disk *>(w.data().raw()));
+	superblock_traits::pack(sb, *reinterpret_cast<superblock_disk *>(w.data()));
 }
 
 void

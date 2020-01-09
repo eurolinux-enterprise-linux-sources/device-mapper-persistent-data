@@ -17,11 +17,12 @@
 // <http://www.gnu.org/licenses/>.
 
 #include "xml_format.h"
+
 #include "base/indented_stream.h"
+#include "base/xml_utils.h"
 
 #include <boost/lexical_cast.hpp>
 #include <boost/optional.hpp>
-#include <expat.h>
 #include <iostream>
 #include <map>
 #include <sstream>
@@ -30,6 +31,7 @@
 
 using namespace std;
 using namespace thin_provisioning;
+using namespace xml_utils;
 
 namespace tp = thin_provisioning;
 
@@ -134,47 +136,6 @@ namespace {
 	//------------------------------------------------
 	// XML parser
 	//------------------------------------------------
-	typedef std::map<string, string> attributes;
-
-	void build_attributes(attributes &a, char const **attr) {
-		while (*attr) {
-			char const *key = *attr;
-
-			attr++;
-			if (!*attr) {
-				ostringstream out;
-				out << "No value given for xml attribute: " << key;
-				throw runtime_error(out.str());
-			}
-
-			char const *value = *attr;
-			a.insert(make_pair(string(key), string(value)));
-			attr++;
-		}
-	}
-
-	template <typename T>
-	T get_attr(attributes const &attr, string const &key) {
-		attributes::const_iterator it = attr.find(key);
-		if (it == attr.end()) {
-			ostringstream out;
-			out << "could not find attribute: " << key;
-			throw runtime_error(out.str());
-		}
-
-		return boost::lexical_cast<T>(it->second);
-	}
-
-	template <typename T>
-	boost::optional<T> get_opt_attr(attributes const &attr, string const &key) {
-		typedef boost::optional<T> rtype;
-		attributes::const_iterator it = attr.find(key);
-		if (it == attr.end())
-			return rtype();
-
-		return rtype(boost::lexical_cast<T>(it->second));
-	}
-
 	void parse_superblock(emitter *e, attributes const &attr) {
 		e->begin_superblock(get_attr<string>(attr, "uuid"),
 				    get_attr<uint64_t>(attr, "time"),
@@ -256,31 +217,14 @@ tp::create_xml_emitter(ostream &out)
 }
 
 void
-tp::parse_xml(std::istream &in, emitter::ptr e)
+tp::parse_xml(std::string const &backup_file, emitter::ptr e, bool quiet)
 {
-	XML_Parser parser = XML_ParserCreate(NULL);
-	if (!parser)
-		throw runtime_error("couldn't create xml parser");
+	xml_parser p;
 
-	XML_SetUserData(parser, e.get());
-	XML_SetElementHandler(parser, start_tag, end_tag);
+	XML_SetUserData(p.get_parser(), e.get());
+	XML_SetElementHandler(p.get_parser(), start_tag, end_tag);
 
-	while (!in.eof()) {
-		char buffer[4096];
-		in.read(buffer, sizeof(buffer));
-		size_t len = in.gcount();
-		int done = in.eof();
-
-		if (!XML_Parse(parser, buffer, len, done)) {
-			ostringstream out;
-			out << "Parse error at line "
-			    << XML_GetCurrentLineNumber(parser)
-			    << ":\n"
-			    << XML_ErrorString(XML_GetErrorCode(parser))
-			    << endl;
-			throw runtime_error(out.str());
-		}
-	}
+	p.parse(backup_file, quiet);
 }
 
 //----------------------------------------------------------------

@@ -17,6 +17,7 @@
 // <http://www.gnu.org/licenses/>.
 
 #include "persistent-data/file_utils.h"
+#include "thin-provisioning/commands.h"
 #include "thin-provisioning/emitter.h"
 #include "thin-provisioning/human_readable_format.h"
 #include "thin-provisioning/metadata.h"
@@ -41,15 +42,14 @@ using namespace thin_provisioning;
 //----------------------------------------------------------------
 
 namespace {
-	int restore(string const &backup_file, string const &dev) {
+	int restore(string const &backup_file, string const &dev, bool quiet) {
 		try {
 			// The block size gets updated by the restorer.
-			metadata::ptr md(new metadata(dev, metadata::CREATE, 128, 0));
+			block_manager<>::ptr bm(open_bm(dev, block_manager<>::READ_WRITE));
+			metadata::ptr md(new metadata(bm, metadata::CREATE, 128, 0));
 			emitter::ptr restorer = create_restore_emitter(md);
 
-			check_file_exists(backup_file);
-			ifstream in(backup_file.c_str(), ifstream::in);
-			parse_xml(in, restorer);
+			parse_xml(backup_file, restorer, quiet);
 
 		} catch (std::exception &e) {
 			cerr << e.what() << endl;
@@ -58,27 +58,39 @@ namespace {
 
 		return 0;
 	}
-
-	void usage(ostream &out, string const &cmd) {
-		out << "Usage: " << cmd << " [options]" << endl
-		    << "Options:" << endl
-		    << "  {-h|--help}" << endl
-		    << "  {-i|--input} <input xml file>" << endl
-		    << "  {-o|--output} <output device or file>" << endl
-		    << "  {-V|--version}" << endl;
-	}
 }
 
-int main(int argc, char **argv)
+//----------------------------------------------------------------
+
+thin_restore_cmd::thin_restore_cmd()
+	: command("thin_restore")
+{
+}
+
+void
+thin_restore_cmd::usage(std::ostream &out) const
+{
+	out << "Usage: " << get_name() << " [options]" << endl
+	    << "Options:" << endl
+	    << "  {-h|--help}" << endl
+	    << "  {-i|--input} <input xml file>" << endl
+	    << "  {-o|--output} <output device or file>" << endl
+	    << "  {-q|--quiet}" << endl
+	    << "  {-V|--version}" << endl;
+}
+
+int
+thin_restore_cmd::run(int argc, char **argv)
 {
 	int c;
-	char const *prog_name = basename(argv[0]);
-	const char *shortopts = "hi:o:V";
+	const char *shortopts = "hi:o:qV";
 	string input, output;
+	bool quiet = false;
 	const struct option longopts[] = {
 		{ "help", no_argument, NULL, 'h'},
 		{ "input", required_argument, NULL, 'i' },
 		{ "output", required_argument, NULL, 'o'},
+		{ "quiet", no_argument, NULL, 'q'},
 		{ "version", no_argument, NULL, 'V'},
 		{ NULL, no_argument, NULL, 0 }
 	};
@@ -86,7 +98,7 @@ int main(int argc, char **argv)
 	while ((c = getopt_long(argc, argv, shortopts, longopts, NULL)) != -1) {
 		switch(c) {
 		case 'h':
-			usage(cout, prog_name);
+			usage(cout);
 			return 0;
 
 		case 'i':
@@ -97,34 +109,38 @@ int main(int argc, char **argv)
 			output = optarg;
 			break;
 
+		case 'q':
+			quiet = true;
+			break;
+
 		case 'V':
 			cout << THIN_PROVISIONING_TOOLS_VERSION << endl;
 			return 0;
 
 		default:
-			usage(cerr, prog_name);
+			usage(cerr);
 			return 1;
 		}
 	}
 
 	if (argc != optind) {
-		usage(cerr, prog_name);
+		usage(cerr);
 		return 1;
 	}
 
         if (input.empty()) {
 		cerr << "No input file provided." << endl << endl;
-		usage(cerr, prog_name);
+		usage(cerr);
 		return 1;
 	}
 
 	if (output.empty()) {
 		cerr << "No output file provided." << endl << endl;
-		usage(cerr, prog_name);
+		usage(cerr);
 		return 1;
 	}
 
-	return restore(input, output);
+	return restore(input, output, quiet);
 }
 
 //----------------------------------------------------------------

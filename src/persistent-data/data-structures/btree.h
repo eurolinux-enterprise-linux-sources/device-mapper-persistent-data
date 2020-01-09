@@ -22,6 +22,7 @@
 #include "base/endian_utils.h"
 #include "persistent-data/transaction_manager.h"
 #include "persistent-data/data-structures/ref_counter.h"
+#include "persistent-data/data-structures/btree_disk_structures.h"
 
 #include <boost/noncopyable.hpp>
 #include <boost/optional.hpp>
@@ -60,36 +61,6 @@ namespace persistent_data {
 	namespace btree_detail {
 		using namespace base;
 		using namespace std;
-
-		uint32_t const BTREE_CSUM_XOR = 121107;
-
-		//------------------------------------------------
-		// On disk data layout for btree nodes
-		enum node_flags {
-			INTERNAL_NODE = 1,
-			LEAF_NODE = 1 << 1
-		};
-
-		struct node_header {
-			le32 csum;
-			le32 flags;
-			le64 blocknr; /* which block this node is supposed to live in */
-
-			le32 nr_entries;
-			le32 max_entries;
-			le32 value_size;
-			le32 padding;
-		} __attribute__((packed));
-
-		struct disk_node {
-			struct node_header header;
-			le64 keys[0];
-		} __attribute__((packed));
-
-		enum node_type {
-			INTERNAL,
-			LEAF
-		};
 
 		//------------------------------------------------
 		// Class that acts as an interface over the raw little endian btree
@@ -161,14 +132,20 @@ namespace persistent_data {
 				return raw_;
 			}
 
+			bool value_sizes_match() const;
+			std::string value_mismatch_string() const;
+
 		private:
 			static unsigned calc_max_entries(void);
+			void check_fits_within_block() const;
 
 			void *key_ptr(unsigned i) const;
 			void *value_ptr(unsigned i) const;
 
 			block_address location_;
 			disk_node *raw_;
+
+			mutable bool checked_; // flag indicating we've checked the data fits in the block
 		};
 
 		//------------------------------------------------
@@ -181,7 +158,7 @@ namespace persistent_data {
 			return node_ref<ValueTraits>(
 				b.get_location(),
 				reinterpret_cast<disk_node *>(
-					const_cast<unsigned char *>(b.data().raw())));
+					const_cast<void *>(b.data())));
 		}
 
 		template <typename ValueTraits>
@@ -190,14 +167,13 @@ namespace persistent_data {
 		{
 			return node_ref<ValueTraits>(
 				b.get_location(),
-				reinterpret_cast<disk_node *>(
-					const_cast<unsigned char *>(b.data().raw())));
+				reinterpret_cast<disk_node *>(b.data()));
 		}
 
 		class ro_spine : private boost::noncopyable {
 		public:
-			ro_spine(transaction_manager::ptr tm,
-				 block_manager<>::validator::ptr v)
+			ro_spine(transaction_manager &tm,
+				 bcache::validator::ptr v)
 				: tm_(tm),
 				  validator_(v) {
 			}
@@ -210,8 +186,8 @@ namespace persistent_data {
 			}
 
 		private:
-			transaction_manager::ptr tm_;
-			block_manager<>::validator::ptr validator_;
+			transaction_manager &tm_;
+			bcache::validator::ptr validator_;
 			std::list<block_manager<>::read_ref> spine_;
 		};
 
@@ -221,8 +197,8 @@ namespace persistent_data {
 			typedef transaction_manager::write_ref write_ref;
 			typedef boost::optional<block_address> maybe_block;
 
-			shadow_spine(transaction_manager::ptr tm,
-				     block_manager<>::validator::ptr v)
+			shadow_spine(transaction_manager &tm,
+				     bcache::validator::ptr v)
 
 				: tm_(tm),
 				  validator_(v) {
@@ -274,8 +250,8 @@ namespace persistent_data {
 			}
 
 		private:
-			transaction_manager::ptr tm_;
-			block_manager<>::validator::ptr validator_;
+			transaction_manager &tm_;
+			bcache::validator::ptr validator_;
 			std::list<block_manager<>::write_ref> spine_;
 		        maybe_block root_;
 		};
@@ -333,10 +309,10 @@ namespace persistent_data {
 		typedef typename btree_detail::node_ref<ValueTraits> leaf_node;
 		typedef typename btree_detail::node_ref<block_traits> internal_node;
 
-		btree(typename persistent_data::transaction_manager::ptr tm,
+		btree(transaction_manager &tm,
 		      typename ValueTraits::ref_counter rc);
 
-		btree(typename transaction_manager::ptr tm,
+		btree(transaction_manager &tm,
 		      block_address root,
 		      typename ValueTraits::ref_counter rc);
 
@@ -432,12 +408,12 @@ namespace persistent_data {
 		void inc_children(btree_detail::shadow_spine &spine,
 				  RefCounter &leaf_rc);
 
-		typename persistent_data::transaction_manager::ptr tm_;
+		transaction_manager &tm_;
 		bool destroy_;
 		block_address root_;
 		block_ref_counter internal_rc_;
 		typename ValueTraits::ref_counter rc_;
-		typename block_manager<>::validator::ptr validator_;
+		typename bcache::validator::ptr validator_;
 	};
 };
 

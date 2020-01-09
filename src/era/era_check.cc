@@ -13,7 +13,9 @@
 #include <unistd.h>
 
 #include "base/error_state.h"
+#include "base/error_string.h"
 #include "base/nested_output.h"
+#include "era/commands.h"
 #include "era/writeset_tree.h"
 #include "era/era_array.h"
 #include "era/superblock.h"
@@ -185,10 +187,7 @@ namespace {
 		int r = ::stat(path.c_str(), &info);
 		if (r) {
 			ostringstream msg;
-			char buffer[128], *ptr;
-
-			ptr = ::strerror_r(errno, buffer, sizeof(buffer));
-			msg << path << ": " << ptr;
+			msg << path << ": " << error_string(errno);;
 			throw runtime_error(msg.str());
 		}
 
@@ -211,22 +210,20 @@ namespace {
 		if (sb_rep.get_error() == FATAL)
 			return FATAL;
 
-		return sb_rep.get_error();
-
 		superblock sb = read_superblock(bm);
 		transaction_manager::ptr tm = open_tm(bm);
 
 		writeset_tree_reporter wt_rep(out);
 		{
 			era_detail_traits::ref_counter rc(tm);
-			writeset_tree wt(tm, sb.writeset_tree_root, rc);
+			writeset_tree wt(*tm, sb.writeset_tree_root, rc);
 			check_writeset_tree(tm, wt, wt_rep);
 		}
 
 		era_array_reporter ea_rep(out);
 		{
 			uint32_traits::ref_counter rc;
-			era_array ea(tm, rc, sb.era_array_root, sb.nr_blocks);
+			era_array ea(*tm, rc, sb.era_array_root, sb.nr_blocks);
 			check_era_array(ea, sb.current_era, ea_rep);
 		}
 
@@ -245,7 +242,7 @@ namespace {
 			throw runtime_error(msg.str());
 		}
 
-		block_manager<>::ptr bm = open_bm(path, block_io<>::READ_ONLY);
+		block_manager<>::ptr bm = open_bm(path, block_manager<>::READ_ONLY);
 		err = metadata_check(bm, fs);
 
 		return err == NO_ERROR ? 0 : 1;
@@ -265,20 +262,28 @@ namespace {
 		return r;
 
 	}
-
-	void usage(ostream &out, string const &cmd) {
-		out << "Usage: " << cmd << " [options] {device|file}" << endl
-		    << "Options:" << endl
-		    << "  {-q|--quiet}" << endl
-		    << "  {-h|--help}" << endl
-		    << "  {-V|--version}" << endl
-		    << "  {--super-block-only}" << endl;
-	}
 }
 
 //----------------------------------------------------------------
 
-int main(int argc, char **argv)
+era_check_cmd::era_check_cmd()
+	: command("era_check")
+{
+}
+
+void
+era_check_cmd::usage(std::ostream &out) const
+{
+	out << "Usage: " << get_name() << " [options] {device|file}" << endl
+	    << "Options:" << endl
+	    << "  {-q|--quiet}" << endl
+	    << "  {-h|--help}" << endl
+	    << "  {-V|--version}" << endl
+	    << "  {--super-block-only}" << endl;
+}
+
+int
+era_check_cmd::run(int argc, char **argv)
 {
 	int c;
 	flags fs;
@@ -298,7 +303,7 @@ int main(int argc, char **argv)
 			break;
 
 		case 'h':
-			usage(cout, basename(argv[0]));
+			usage(cout);
 			return 0;
 
 		case 'q':
@@ -310,14 +315,14 @@ int main(int argc, char **argv)
 			return 0;
 
 		default:
-			usage(cerr, basename(argv[0]));
+			usage(cerr);
 			return 1;
 		}
 	}
 
 	if (argc == optind) {
 		cerr << "No input file provided." << endl;
-		usage(cerr, basename(argv[0]));
+		usage(cerr);
 		return 1;
 	}
 

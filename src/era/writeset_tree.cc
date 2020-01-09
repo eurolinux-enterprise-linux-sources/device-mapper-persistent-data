@@ -2,7 +2,6 @@
 #include "persistent-data/data-structures/btree_damage_visitor.h"
 #include "persistent-data/data-structures/bitset.h"
 
-using namespace boost;
 using namespace era;
 using namespace writeset_tree_detail;
 using namespace persistent_data;
@@ -48,13 +47,14 @@ namespace {
 				    writeset_tree_detail::writeset_visitor &writeset_v,
 				    writeset_tree_detail::damage_visitor &dv)
 			: tm_(tm),
+			  era_(0),
 			  writeset_v_(writeset_v),
 			  dv_(dv) {
 		}
 
 		void visit(btree_path const &path, era_detail const &era) {
 			era_ = path[0];
-			persistent_data::bitset bs(tm_, era.writeset_root, era.nr_bits);
+			persistent_data::bitset bs(*tm_, era.writeset_root, era.nr_bits);
 			writeset_v_.writeset_begin(era_, era.nr_bits);
 			bs.walk_bitset(*this);
 			writeset_v_.writeset_end();
@@ -89,8 +89,8 @@ namespace {
 	private:
 		template <typename T>
 		run<uint32_t> to_uint32(run<T> const &r) {
-			return run<uint32_t>(optional<uint32_t>(r.begin_),
-					     optional<uint32_t>(r.end_));
+			return run<uint32_t>(boost::optional<uint32_t>(r.begin_),
+					     boost::optional<uint32_t>(r.end_));
 		}
 
 		damage_visitor &v_;

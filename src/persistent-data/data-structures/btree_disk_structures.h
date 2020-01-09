@@ -16,44 +16,47 @@
 // with thin-provisioning-tools.  If not, see
 // <http://www.gnu.org/licenses/>.
 
-#ifndef LOCK_TRACKER_H
-#define LOCK_TRACKER_H
+#ifndef PERSISTENT_DATA_BTREE_DISK_STRUCTURES_H
+#define PERSISTENT_DATA_BTREE_DISK_STRUCTURES_H
 
-#include <boost/noncopyable.hpp>
-#include <boost/optional.hpp>
-#include <map>
-#include <stdint.h>
-
+#include "base/endian_utils.h"
 
 //----------------------------------------------------------------
 
 namespace persistent_data {
-	class lock_tracker : private boost::noncopyable {
-	public:
-		lock_tracker(uint64_t low, uint64_t high);
+	namespace btree_detail {
+		using namespace base;
 
-		void read_lock(uint64_t key);
-		void write_lock(uint64_t key);
-		void superblock_lock(uint64_t key);
-		void unlock(uint64_t key);
+		uint32_t const BTREE_CSUM_XOR = 121107;
 
-		bool is_locked(uint64_t key) const;
+		//------------------------------------------------
+		// On disk data layout for btree nodes
+		enum node_flags {
+			INTERNAL_NODE = 1,
+			LEAF_NODE = 1 << 1
+		};
 
-	private:
-		typedef std::map<uint64_t, int> LockMap;
+		struct node_header {
+			le32 csum;
+			le32 flags;
+			le64 blocknr; /* which block this node is supposed to live in */
 
-		bool found(LockMap::const_iterator it) const;
+			le32 nr_entries;
+			le32 max_entries;
+			le32 value_size;
+			le32 padding;
+		} __attribute__((packed));
 
-		bool valid_key(uint64_t key) const;
-		void check_key(uint64_t key) const;
+		struct disk_node {
+			struct node_header header;
+			le64 keys[0];
+		} __attribute__((packed));
 
-		// Positive for read lock, negative for write lock
-		LockMap locks_;
-		boost::optional<uint64_t> superblock_;
-
-		uint64_t low_;
-		uint64_t high_;
-	};
+		enum node_type {
+			INTERNAL,
+			LEAF
+		};
+	}
 }
 
 //----------------------------------------------------------------

@@ -84,7 +84,7 @@ namespace {
 
 	//--------------------------------
 
-	typedef map<block_address, device_tree_detail::device_details> dd_map;
+ 	typedef map<block_address, device_tree_detail::device_details> dd_map;
 
 	class details_extractor : public device_tree_detail::device_visitor {
 	public:
@@ -185,8 +185,13 @@ namespace {
 						 d.creation_time_,
 						 d.snapshotted_time_);
 
-				emit_mappings(tree_root);
-
+				try {
+					emit_mappings(tree_root);
+				} catch (exception &e) {
+					cerr << e.what();
+					e_->end_device();
+					throw;
+				}
 				e_->end_device();
 
 			} else if (!repair_) {
@@ -200,7 +205,7 @@ namespace {
 	private:
 		void emit_mappings(block_address subtree_root) {
 			mapping_emitter me(e_);
-			single_mapping_tree tree(md_->tm_, subtree_root,
+			single_mapping_tree tree(*md_->tm_, subtree_root,
 						 mapping_tree_detail::block_time_ref_counter(md_->data_sm_));
 			walk_mapping_tree(tree, static_cast<mapping_tree_detail::mapping_visitor &>(me), *damage_policy_);
 		}
@@ -211,6 +216,19 @@ namespace {
 		bool repair_;
 		mapping_tree_detail::damage_visitor::ptr damage_policy_;
 	};
+
+	block_address get_nr_blocks(metadata::ptr md) {
+		if (md->data_sm_)
+			return md->data_sm_->get_nr_blocks();
+
+		else if (md->sb_.blocknr_ == superblock_detail::SUPERBLOCK_LOCATION)
+			// grab from the root structure of the space map
+			return get_nr_blocks_in_data_sm(*md->tm_, &md->sb_.data_space_map_root_);
+
+		else
+			// metadata snap, we really don't know
+			return 0ull;
+	}
 }
 
 //----------------------------------------------------------------
@@ -225,8 +243,8 @@ thin_provisioning::metadata_dump(metadata::ptr md, emitter::ptr e, bool repair)
 	e->begin_superblock("", md->sb_.time_,
 			    md->sb_.trans_id_,
 			    md->sb_.data_block_size_,
-			    md->data_sm_->get_nr_blocks(),
-			    optional<block_address>());
+			    get_nr_blocks(md),
+			    boost::optional<block_address>());
 
 	{
 		mapping_tree_detail::damage_visitor::ptr md_policy(mapping_damage_policy(repair));

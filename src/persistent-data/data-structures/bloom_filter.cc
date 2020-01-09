@@ -7,7 +7,7 @@ using namespace persistent_data;
 //----------------------------------------------------------------
 
 namespace {
-	static const uint64_t m1 = 0x9e37fffffffc0001UL;
+	static const uint64_t m1 = 0x9e37fffffffc0001ULL;
 	static const unsigned bits = 18;
 
 	static uint32_t hash1(block_address const &b) {
@@ -34,7 +34,7 @@ namespace {
 
 //----------------------------------------------------------------
 
-bloom_filter::bloom_filter(tm_ptr tm,
+bloom_filter::bloom_filter(transaction_manager &tm,
 			   unsigned nr_bits, unsigned nr_probes)
 	: tm_(tm),
 	  bits_(tm),
@@ -45,7 +45,7 @@ bloom_filter::bloom_filter(tm_ptr tm,
 	bits_.grow(nr_bits, false);
 }
 
-bloom_filter::bloom_filter(tm_ptr tm, block_address root,
+bloom_filter::bloom_filter(transaction_manager &tm, block_address root,
 			   unsigned nr_bits, unsigned nr_probes)
 	: tm_(tm),
 	  bits_(tm, root, nr_bits),

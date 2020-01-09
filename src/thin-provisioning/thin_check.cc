@@ -22,13 +22,17 @@
 
 #include "version.h"
 
+#include "base/application.h"
 #include "base/error_state.h"
 #include "base/nested_output.h"
+#include "persistent-data/data-structures/btree_counter.h"
 #include "persistent-data/space-maps/core.h"
+#include "persistent-data/space-maps/disk.h"
 #include "persistent-data/file_utils.h"
 #include "thin-provisioning/device_tree.h"
 #include "thin-provisioning/mapping_tree.h"
 #include "thin-provisioning/superblock.h"
+#include "thin-provisioning/commands.h"
 
 using namespace base;
 using namespace std;
@@ -37,12 +41,10 @@ using namespace thin_provisioning;
 //----------------------------------------------------------------
 
 namespace {
-	//--------------------------------
-
 	block_manager<>::ptr
 	open_bm(string const &path) {
 		block_address nr_blocks = get_nr_blocks(path);
-		block_io<>::mode m = block_io<>::READ_ONLY;
+		block_manager<>::mode m = block_manager<>::READ_ONLY;
 		return block_manager<>::ptr(new block_manager<>(path, nr_blocks, 1, m));
 	}
 
@@ -69,7 +71,7 @@ namespace {
 				nested_output::nest _ = out_.push();
 				out_ << d.desc_ << end_message();
 			}
-			err_ = combine_errors(err_, FATAL);
+			err_ << FATAL;
 		}
 
 		base::error_state get_error() const {
@@ -97,7 +99,7 @@ namespace {
 				out_ << d.desc_ << end_message();
 			}
 
-			err_ = combine_errors(err_, FATAL);
+			err_ << FATAL;
 		}
 
 		error_state get_error() const {
@@ -124,7 +126,7 @@ namespace {
 				nested_output::nest _ = out_.push();
 				out_ << d.desc_ << end_message();
 			}
-			err_ = combine_errors(err_, FATAL);
+			err_ << FATAL;
 		}
 
 		virtual void visit(mapping_tree_detail::missing_mappings const &d) {
@@ -133,7 +135,7 @@ namespace {
 				nested_output::nest _ = out_.push();
 				out_ << d.desc_ << end_message();
 			}
-			err_ = combine_errors(err_, FATAL);
+			err_ << FATAL;
 		}
 
 		error_state get_error() const {
@@ -167,6 +169,82 @@ namespace {
 		bool clear_needs_check_flag_on_success;
 	};
 
+	void count_trees(transaction_manager::ptr tm,
+			 superblock_detail::superblock &sb,
+			 block_counter &bc) {
+
+		// Count the device tree
+		{
+			noop_value_counter<device_tree_detail::device_details> vc;
+			device_tree dtree(*tm, sb.device_details_root_,
+					  device_tree_detail::device_details_traits::ref_counter());
+			count_btree_blocks(dtree, bc, vc);
+		}
+
+		// Count the mapping tree
+		{
+			noop_value_counter<mapping_tree_detail::block_time> vc;
+			mapping_tree mtree(*tm, sb.data_mapping_root_,
+					   mapping_tree_detail::block_traits::ref_counter(tm->get_sm()));
+			count_btree_blocks(mtree, bc, vc);
+		}
+	}
+
+	error_state check_space_map_counts(flags const &fs, nested_output &out,
+					   superblock_detail::superblock &sb,
+					   block_manager<>::ptr bm,
+					   transaction_manager::ptr tm) {
+		block_counter bc;
+
+		// Count the superblock
+		bc.inc(superblock_detail::SUPERBLOCK_LOCATION);
+		count_trees(tm, sb, bc);
+
+		// Count the metadata snap, if present
+		if (sb.metadata_snap_ != superblock_detail::SUPERBLOCK_LOCATION) {
+			bc.inc(sb.metadata_snap_);
+
+			superblock_detail::superblock snap = read_superblock(bm, sb.metadata_snap_);
+			count_trees(tm, snap, bc);
+		}
+
+		// Count the metadata space map
+		{
+			persistent_space_map::ptr metadata_sm =
+				open_metadata_sm(*tm, static_cast<void *>(&sb.metadata_space_map_root_));
+			metadata_sm->count_metadata(bc);
+		}
+
+		// Count the data space map
+		{
+			persistent_space_map::ptr data_sm =
+				open_disk_sm(*tm, static_cast<void *>(&sb.data_space_map_root_));
+			data_sm->count_metadata(bc);
+		}
+
+		// Finally we need to check the metadata space map agrees
+		// with the counts we've just calculated.
+		error_state err = NO_ERROR;
+		nested_output::nest _ = out.push();
+		persistent_space_map::ptr metadata_sm =
+			open_metadata_sm(*tm, static_cast<void *>(&sb.metadata_space_map_root_));
+		for (unsigned b = 0; b < metadata_sm->get_nr_blocks(); b++) {
+			ref_t c_actual = metadata_sm->get_count(b);
+			ref_t c_expected = bc.get_count(b);
+
+			if (c_actual != c_expected) {
+				out << "metadata reference counts differ for block " << b
+				    << ", expected " << c_expected
+				    << ", but got " << c_actual
+				    << end_message();
+
+				err << (c_actual > c_expected ? NON_FATAL : FATAL);
+			}
+		}
+
+		return err;
+	}
+
 	error_state metadata_check(string const &path, flags fs) {
 		block_manager<>::ptr bm = open_bm(path);
 
@@ -194,7 +272,7 @@ namespace {
 			out << "examining devices tree" << end_message();
 			{
 				nested_output::nest _ = out.push();
-				device_tree dtree(tm, sb.device_details_root_,
+				device_tree dtree(*tm, sb.device_details_root_,
 						  device_tree_detail::device_details_traits::ref_counter());
 				check_device_tree(dtree, dev_rep);
 			}
@@ -204,7 +282,7 @@ namespace {
 			out << "examining top level of mapping tree" << end_message();
 			{
 				nested_output::nest _ = out.push();
-				dev_tree dtree(tm, sb.data_mapping_root_,
+				dev_tree dtree(*tm, sb.data_mapping_root_,
 					       mapping_tree_detail::mtree_traits::ref_counter(tm));
 				check_mapping_tree(dtree, mapping_rep);
 			}
@@ -213,19 +291,27 @@ namespace {
 			out << "examining mapping tree" << end_message();
 			{
 				nested_output::nest _ = out.push();
-				mapping_tree mtree(tm, sb.data_mapping_root_,
+				mapping_tree mtree(*tm, sb.data_mapping_root_,
 						   mapping_tree_detail::block_traits::ref_counter(tm->get_sm()));
 				check_mapping_tree(mtree, mapping_rep);
 			}
 		}
 
-		return combine_errors(sb_rep.get_error(),
-				      combine_errors(mapping_rep.get_error(),
-						     dev_rep.get_error()));
+		error_state err = NO_ERROR;
+		err << sb_rep.get_error() << mapping_rep.get_error() << dev_rep.get_error();
+
+		// if we're checking everything, and there were no errors,
+		// then we should check the space maps too.
+		if (fs.check_device_tree && fs.check_mapping_tree_level2 && err != FATAL) {
+			out << "checking space map counts" << end_message();
+			err << check_space_map_counts(fs, out, sb, bm, tm);
+		}
+
+		return err;
 	}
 
 	void clear_needs_check(string const &path) {
-		block_manager<>::ptr bm = open_bm(path, block_io<>::READ_WRITE);
+		block_manager<>::ptr bm = open_bm(path, block_manager<>::READ_WRITE);
 
 		superblock_detail::superblock sb = read_superblock(bm);
 		sb.set_needs_check_flag(false);
@@ -242,11 +328,11 @@ namespace {
 			err = metadata_check(path, fs);
 
 			if (fs.ignore_non_fatal_errors)
-				success = (err == FATAL) ? 1 : 0;
+				success = (err == FATAL) ? false : true;
 			else
-				success =  (err == NO_ERROR) ? 0 : 1;
+				success = (err == NO_ERROR) ? true : false;
 
-			if (!success && fs.clear_needs_check_flag_on_success)
+			if (success && fs.clear_needs_check_flag_on_success)
 				clear_needs_check(path);
 
 		} catch (std::exception &e) {
@@ -256,23 +342,33 @@ namespace {
 			return 1;
 		}
 
-		return success;
-	}
-
-	void usage(ostream &out, string const &cmd) {
-		out << "Usage: " << cmd << " [options] {device|file}" << endl
-		    << "Options:" << endl
-		    << "  {-q|--quiet}" << endl
-		    << "  {-h|--help}" << endl
-		    << "  {-V|--version}" << endl
-		    << "  {--clear-needs-check-flag}" << endl
-		    << "  {--ignore-non-fatal-errors}" << endl
-		    << "  {--skip-mappings}" << endl
-		    << "  {--super-block-only}" << endl;
+		return !success;
 	}
 }
 
-int main(int argc, char **argv)
+//----------------------------------------------------------------
+
+thin_check_cmd::thin_check_cmd()
+	: command("thin_check")
+{
+}
+
+void
+thin_check_cmd::usage(std::ostream &out) const
+{
+	out << "Usage: " << get_name() << " [options] {device|file}" << endl
+	    << "Options:" << endl
+	    << "  {-q|--quiet}" << endl
+	    << "  {-h|--help}" << endl
+	    << "  {-V|--version}" << endl
+	    << "  {--clear-needs-check-flag}" << endl
+	    << "  {--ignore-non-fatal-errors}" << endl
+	    << "  {--skip-mappings}" << endl
+	    << "  {--super-block-only}" << endl;
+}
+
+int
+thin_check_cmd::run(int argc, char **argv)
 {
 	int c;
 	flags fs;
@@ -292,7 +388,7 @@ int main(int argc, char **argv)
 	while ((c = getopt_long(argc, argv, shortopts, longopts, NULL)) != -1) {
 		switch(c) {
 		case 'h':
-			usage(cout, basename(argv[0]));
+			usage(cout);
 			return 0;
 
 		case 'q':
@@ -326,7 +422,7 @@ int main(int argc, char **argv)
 			break;
 
 		default:
-			usage(cerr, basename(argv[0]));
+			usage(cerr);
 			return 1;
 		}
 	}
@@ -334,7 +430,7 @@ int main(int argc, char **argv)
 	if (argc == optind) {
 		if (!fs.quiet) {
 			cerr << "No input file provided." << endl;
-			usage(cerr, basename(argv[0]));
+			usage(cerr);
 		}
 
 		exit(1);
@@ -342,3 +438,5 @@ int main(int argc, char **argv)
 
 	return check(argv[optind], fs);
 }
+
+//----------------------------------------------------------------

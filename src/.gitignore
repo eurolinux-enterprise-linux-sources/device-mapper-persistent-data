@@ -8,23 +8,9 @@
 test.data
 cachegrind.*
 \#*\#
+core
 
-thin_check
-thin_dump
-thin_restore
-thin_repair
-thin_rmap
-thin_metadata_size
-
-cache_check
-cache_dump
-cache_restore
-cache_repair
-cache_metadata_size
-
-era_check
-era_dump
-era_invalidate
+bin/pdata_tools
 
 *.metadata
 bad-metadata
@@ -47,3 +33,5 @@ config.cache
 config.log
 config.status
 configure
+
+callgrind.*
