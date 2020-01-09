@@ -1,8 +1,9 @@
 #ifndef THIN_SUPERBLOCK_H
 #define THIN_SUPERBLOCK_H
 
+#include "base/endian_utils.h"
+
 #include "persistent-data/block.h"
-#include "persistent-data/endian_utils.h"
 #include "persistent-data/data-structures/ref_counter.h"
 
 //----------------------------------------------------------------
@@ -80,6 +81,9 @@ namespace thin_provisioning {
 			uint32_t compat_flags_;
 			uint32_t compat_ro_flags_;
 			uint32_t incompat_flags_;
+
+			bool get_needs_check_flag() const;
+			void set_needs_check_flag(bool val = true);
 		};
 
 		struct superblock_traits {
@@ -125,7 +129,12 @@ namespace thin_provisioning {
 	// FIXME: should we put init_superblock in here too?
 
 	superblock_detail::superblock read_superblock(persistent_data::block_manager<>::ptr bm);
-	superblock_detail::superblock read_superblock(persistent_data::block_manager<>::ptr bm, persistent_data::block_address location);
+	superblock_detail::superblock read_superblock(persistent_data::block_manager<>::ptr bm,
+						      persistent_data::block_address location);
+
+	void write_superblock(persistent_data::block_manager<>::ptr bm,
+			      superblock_detail::superblock const &sb);
+
 	void check_superblock(persistent_data::block_manager<>::ptr bm,
 			      superblock_detail::damage_visitor &visitor);
 }

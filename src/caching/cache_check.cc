@@ -17,6 +17,7 @@
 #include "caching/metadata.h"
 #include "persistent-data/block.h"
 #include "persistent-data/file_utils.h"
+#include "persistent-data/space_map.h"
 #include "persistent-data/space-maps/core.h"
 #include "version.h"
 
@@ -158,6 +159,15 @@ namespace {
 		using reporter_base::get_error;
 	};
 
+	class space_map_reporter : public space_map_detail::visitor, reporter_base {
+	public:
+		space_map_reporter(nested_output &o)
+		: reporter_base(o) {
+		}
+
+		using reporter_base::get_error;
+	};
+
 	//--------------------------------
 
 	transaction_manager::ptr open_tm(block_manager<>::ptr bm) {
@@ -254,7 +264,7 @@ namespace {
 				out << "examining discard bitset" << end_message();
 				{
 					nested_output::nest _ = out.push();
-					bitset discards(tm, sb.discard_root, sb.discard_nr_blocks);
+					persistent_data::bitset discards(tm, sb.discard_root, sb.discard_nr_blocks);
 				}
 			}
 		}
@@ -319,7 +329,7 @@ int main(int argc, char **argv)
 	const char shortopts[] = "qhV";
 	const struct option longopts[] = {
 		{ "quiet", no_argument, NULL, 'q' },
-		{ "superblock-only", no_argument, NULL, 1 },
+		{ "super-block-only", no_argument, NULL, 1 },
 		{ "skip-mappings", no_argument, NULL, 2 },
 		{ "skip-hints", no_argument, NULL, 3 },
 		{ "skip-discards", no_argument, NULL, 4 },

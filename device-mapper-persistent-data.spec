@@ -3,38 +3,27 @@
 #
 Summary: Device-mapper thin provisioning tools
 Name: device-mapper-persistent-data
-Version: 0.2.8
-Release: 4%{?dist}
+Version: 0.3.2
+Release: 1%{?dist}
 License: GPLv3+
 Group: System Environment/Base
 URL: https://github.com/jthornber/thin-provisioning-tools
 Source0: https://github.com/jthornber/thin-provisioning-tools/archive/thin-provisioning-tools-v%{version}.tar.bz2
 # Source1: https://github.com/jthornber/thin-provisioning-tools/archive/v%{version}.tar.gz
-Patch0: device-mapper-persistent-data-0.2.8-1-missing-man-pages.patch
-Patch1: device-mapper-persistent-data-0.2.8-1-missing-installs.patch
-Patch2: device-mapper-persistent-data-0.2.8-1-fix_compile_errors.patch
-Patch3: device-mapper-persistent-data-0.2.8-3-add-critical-clear-needs-check-flag.patch
-Patch4: device-mapper-persistent-data-0.2.8-3-remove-cache-tools.patch
-Patch5: device-mapper-persistent-data-0.2.8-3-add-clear-needs-check-flag-to-man-page.patch
-Patch6: device-mapper-persistent-data-0.2.8-4-fix-bz-960284-thin_dump-and-other-persistent-data-to.patch
+Patch0: device-mapper-persistent-data-0.3.2-1-fix_typename.patch
 BuildRequires: autoconf, expat-devel, libstdc++-devel, boost-devel
 Requires: expat
 
 %description
 thin-provisioning-tools contains check,dump,restore,repair,rmap
 and metadata_size tools to manage device-mapper thin provisioning
-target metadata devices
-
+target metadata devices; cache check,dump,restore and repair tools
+to manage device-mapper cache metadata devices are included and
+era check, dump and invalidate to manage snapshot eras
 
 %prep
 %setup -q -n thin-provisioning-tools-%{version}
 %patch0 -p1
-%patch1 -p1
-%patch2 -p1
-%patch3 -p1
-%patch4 -p1
-%patch5 -p1
-%patch6 -p1
 echo %{version}-%{release} > VERSION
 
 %build
@@ -49,12 +38,23 @@ make DESTDIR=%{buildroot} MANDIR=%{_mandir} install
 
 %files
 %doc COPYING README.md
+%{_mandir}/man8/cache_check.8.gz
+%{_mandir}/man8/cache_dump.8.gz
+%{_mandir}/man8/cache_restore.8.gz
+%{_mandir}/man8/cache_repair.8.gz
 %{_mandir}/man8/thin_check.8.gz
 %{_mandir}/man8/thin_dump.8.gz
 %{_mandir}/man8/thin_metadata_size.8.gz
 %{_mandir}/man8/thin_repair.8.gz
 %{_mandir}/man8/thin_restore.8.gz
 %{_mandir}/man8/thin_rmap.8.gz
+%{_sbindir}/cache_check
+%{_sbindir}/cache_dump
+%{_sbindir}/cache_restore
+%{_sbindir}/cache_repair
+%{_sbindir}/era_check
+%{_sbindir}/era_dump
+%{_sbindir}/era_invalidate
 %{_sbindir}/thin_check
 %{_sbindir}/thin_dump
 %{_sbindir}/thin_metadata_size
@@ -63,14 +63,12 @@ make DESTDIR=%{buildroot} MANDIR=%{_mandir} install
 %{_sbindir}/thin_rmap
 
 %changelog
-* Mon Apr 14 2014 Heinz Mauelshagen <heinzm@redhat.com> - 0.2.8-4
-- Add missing 4K alignment patch
-  Resolves: #1086824
+* Thu Apr 3 2014 Heinz Mauelshagen <heinzm@redhat.com> - 0.3.2-1
+- New upstream version 0.3.2 introducing era_{check,dump,invalidate}
+  Resolves: #1035990 #1084081
 
-* Mon Apr 14 2014 Heinz Mauelshagen <heinzm@redhat.com> - 0.2.8-3
-- Add critical needs_check flag support
-- No support for the cache target in RHEL-6.5, thus avoid packaging cache tools and man pages
-  Resolves: #1086824
+* Thu Jan 30 2014 Heinz Mauelshagen <heinzm@redhat.com> - 0.2.8-3
+  Resolves: #1035990
 
 * Mon Oct 21 2013 Heinz Mauelshagen <heinzm@redhat.com> - 0.2.8-2
 - New upstream version 0.2.8 introducing cache_{check,dump,repair,restore}; missing patch

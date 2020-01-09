@@ -24,6 +24,11 @@ PROGRAMS=\
 	cache_dump \
 	cache_restore \
 	cache_repair \
+	cache_metadata_size \
+	\
+	era_check \
+	era_dump \
+	era_invalidate \
 	\
 	thin_check \
 	thin_dump \
@@ -36,6 +41,7 @@ all: $(PROGRAMS)
 
 SOURCE=\
 	base/base64.cc \
+	base/endian_utils.cc \
 	base/error_state.cc \
 	\
 	caching/hint_array.cc \
@@ -46,8 +52,15 @@ SOURCE=\
 	caching/restore_emitter.cc \
 	caching/xml_format.cc \
 	\
+	era/era_array.cc \
+	era/era_detail.cc \
+	era/superblock.cc \
+	era/writeset_tree.cc \
+	era/metadata.cc \
+	era/metadata_dump.cc \
+	era/xml_format.cc \
+	\
 	persistent-data/checksum.cc \
-	persistent-data/endian_utils.cc \
 	persistent-data/error_set.cc \
 	persistent-data/file_utils.cc \
 	persistent-data/hex_dump.cc \
@@ -55,6 +68,7 @@ SOURCE=\
 	persistent-data/transaction_manager.cc \
 	\
 	persistent-data/data-structures/bitset.cc \
+	persistent-data/data-structures/bloom_filter.cc \
 	persistent-data/data-structures/btree.cc \
 	\
 	persistent-data/space_map.cc \
@@ -153,8 +167,9 @@ THIN_REPAIR_SOURCE=$(SOURCE)
 THIN_RESTORE_SOURCE=$(SOURCE)
 THIN_CHECK_SOURCE=\
 	base/error_state.cc \
+	base/endian_utils.cc \
+	\
 	persistent-data/checksum.cc \
-	persistent-data/endian_utils.cc \
 	persistent-data/error_set.cc \
 	persistent-data/file_utils.cc \
 	persistent-data/hex_dump.cc \
@@ -165,6 +180,7 @@ THIN_CHECK_SOURCE=\
 	persistent-data/space-maps/recursive.cc \
 	persistent-data/space-maps/careful_alloc.cc \
 	persistent-data/transaction_manager.cc \
+	\
 	thin-provisioning/device_tree.cc \
 	thin-provisioning/mapping_tree.cc \
 	thin-provisioning/metadata.cc \
@@ -172,8 +188,9 @@ THIN_CHECK_SOURCE=\
 	thin-provisioning/superblock.cc
 
 THIN_RMAP_SOURCE=\
+	base/endian_utils.cc \
+	\
 	persistent-data/checksum.cc \
-	persistent-data/endian_utils.cc \
 	persistent-data/error_set.cc \
 	persistent-data/file_utils.cc \
 	persistent-data/hex_dump.cc \
@@ -232,8 +249,9 @@ thin_metadata_size: thin-provisioning/thin_metadata_size.o
 CACHE_CHECK_SOURCE=\
 	base/base64.cc \
 	base/error_state.cc \
+	base/endian_utils.cc \
+	\
 	persistent-data/checksum.cc \
-	persistent-data/endian_utils.cc \
 	persistent-data/error_set.cc \
 	persistent-data/file_utils.cc \
 	persistent-data/hex_dump.cc \
@@ -245,6 +263,7 @@ CACHE_CHECK_SOURCE=\
 	persistent-data/space-maps/recursive.cc \
 	persistent-data/space-maps/careful_alloc.cc \
 	persistent-data/transaction_manager.cc \
+	\
 	caching/hint_array.cc \
 	caching/superblock.cc \
 	caching/mapping_array.cc \
@@ -280,6 +299,109 @@ cache_restore: $(CACHE_RESTORE_OBJECTS) caching/cache_restore.o
 	@echo "    [LD]  $@"
 	$(V) $(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $+ $(LIBS) $(LIBEXPAT)
 
+cache_metadata_size: caching/cache_metadata_size.o
+	@echo "    [LD]  $@"
+	$(V) $(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $+ $(LIBS)
+
+#----------------------------------------------------------------
+# Era tools
+
+ERA_CHECK_SOURCE=\
+	base/base64.cc \
+	base/error_state.cc \
+	base/endian_utils.cc \
+	\
+	era/writeset_tree.cc \
+	era/era_detail.cc \
+	era/era_array.cc \
+	era/metadata.cc \
+	era/superblock.cc \
+	\
+	persistent-data/checksum.cc \
+	persistent-data/error_set.cc \
+	persistent-data/file_utils.cc \
+	persistent-data/hex_dump.cc \
+	persistent-data/lock_tracker.cc \
+	persistent-data/data-structures/btree.cc \
+	persistent-data/data-structures/bitset.cc \
+	persistent-data/space_map.cc \
+	persistent-data/space-maps/disk.cc \
+	persistent-data/space-maps/recursive.cc \
+	persistent-data/space-maps/careful_alloc.cc \
+	persistent-data/transaction_manager.cc \
+
+ERA_CHECK_OBJECTS=$(subst .cc,.o,$(ERA_CHECK_SOURCE))
+
+era_check: $(ERA_CHECK_OBJECTS) era/era_check.o
+	@echo "    [LD]  $@"
+	$(V) $(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $+ $(LIBS) $(LIBEXPAT)
+
+ERA_DUMP_SOURCE=\
+	base/base64.cc \
+	base/error_state.cc \
+	base/endian_utils.cc \
+	\
+	era/writeset_tree.cc \
+	era/era_detail.cc \
+	era/era_array.cc \
+	era/metadata.cc \
+	era/metadata_dump.cc \
+	era/superblock.cc \
+	era/xml_format.cc \
+	\
+	persistent-data/checksum.cc \
+	persistent-data/error_set.cc \
+	persistent-data/file_utils.cc \
+	persistent-data/hex_dump.cc \
+	persistent-data/lock_tracker.cc \
+	persistent-data/data-structures/btree.cc \
+	persistent-data/data-structures/bitset.cc \
+	persistent-data/space_map.cc \
+	persistent-data/space-maps/disk.cc \
+	persistent-data/space-maps/recursive.cc \
+	persistent-data/space-maps/careful_alloc.cc \
+	persistent-data/transaction_manager.cc \
+
+ERA_DUMP_OBJECTS=$(subst .cc,.o,$(ERA_DUMP_SOURCE))
+
+era_dump: $(ERA_DUMP_OBJECTS)  era/era_dump.o
+	@echo "    [LD]  $@"
+	$(V) $(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $+ $(LIBS)
+
+ERA_INVALIDATE_SOURCE=\
+	base/base64.cc \
+	base/error_state.cc \
+	base/endian_utils.cc \
+	\
+	era/writeset_tree.cc \
+	era/era_detail.cc \
+	era/era_array.cc \
+	era/metadata.cc \
+	era/metadata_dump.cc \
+	era/superblock.cc \
+	era/xml_format.cc \
+	\
+	persistent-data/checksum.cc \
+	persistent-data/error_set.cc \
+	persistent-data/file_utils.cc \
+	persistent-data/hex_dump.cc \
+	persistent-data/lock_tracker.cc \
+	persistent-data/data-structures/btree.cc \
+	persistent-data/data-structures/bitset.cc \
+	persistent-data/space_map.cc \
+	persistent-data/space-maps/disk.cc \
+	persistent-data/space-maps/recursive.cc \
+	persistent-data/space-maps/careful_alloc.cc \
+	persistent-data/transaction_manager.cc \
+
+ERA_INVALIDATE_OBJECTS=$(subst .cc,.o,$(ERA_INVALIDATE_SOURCE))
+
+era_invalidate: $(ERA_INVALIDATE_OBJECTS)  era/era_invalidate.o
+	@echo "    [LD]  $@"
+	$(V) $(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $+ $(LIBS)
+
+#----------------------------------------------------------------
+
 DEPEND_FILES=\
 	$(subst .cc,.d,$(SOURCE)) \
 	$(subst .cc,.d,$(TEST_SOURCE)) \
@@ -299,13 +421,24 @@ distclean: clean
 
 install: $(PROGRAMS)
 	$(INSTALL_DIR) $(BINDIR)
+	$(INSTALL_PROGRAM) cache_check $(BINDIR)
+	$(INSTALL_PROGRAM) cache_dump $(BINDIR)
+	$(INSTALL_PROGRAM) cache_repair $(BINDIR)
+	$(INSTALL_PROGRAM) cache_restore $(BINDIR)
 	$(INSTALL_PROGRAM) thin_check $(BINDIR)
 	$(INSTALL_PROGRAM) thin_dump $(BINDIR)
 	$(INSTALL_PROGRAM) thin_repair $(BINDIR)
 	$(INSTALL_PROGRAM) thin_restore $(BINDIR)
 	$(INSTALL_PROGRAM) thin_rmap $(BINDIR)
 	$(INSTALL_PROGRAM) thin_metadata_size $(BINDIR)
+	$(INSTALL_PROGRAM) era_check $(BINDIR)
+	$(INSTALL_PROGRAM) era_dump $(BINDIR)
+	$(INSTALL_PROGRAM) era_invalidate $(BINDIR)
 	$(INSTALL_DIR) $(MANPATH)/man8
+	$(INSTALL_DATA) man8/cache_check.8 $(MANPATH)/man8
+	$(INSTALL_DATA) man8/cache_dump.8 $(MANPATH)/man8
+	$(INSTALL_DATA) man8/cache_repair.8 $(MANPATH)/man8
+	$(INSTALL_DATA) man8/cache_restore.8 $(MANPATH)/man8
 	$(INSTALL_DATA) man8/thin_check.8 $(MANPATH)/man8
 	$(INSTALL_DATA) man8/thin_dump.8 $(MANPATH)/man8
 	$(INSTALL_DATA) man8/thin_repair.8 $(MANPATH)/man8

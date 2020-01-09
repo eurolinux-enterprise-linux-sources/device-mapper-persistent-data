@@ -27,10 +27,12 @@ namespace {
 
 namespace persistent_data {
 	namespace bitset_detail {
+		size_t BITS_PER_ULL = 64;
+
 		class bitset_impl {
 		public:
 			typedef boost::shared_ptr<bitset_impl> ptr;
-			typedef typename persistent_data::transaction_manager::ptr tm_ptr;
+			typedef persistent_data::transaction_manager::ptr tm_ptr;
 
 			bitset_impl(tm_ptr tm)
 			: nr_bits_(0),
@@ -39,11 +41,15 @@ namespace persistent_data {
 
 			bitset_impl(tm_ptr tm, block_address root, unsigned nr_bits)
 				: nr_bits_(nr_bits),
-				  array_(tm, rc_, root, nr_bits) {
+				  array_(tm, rc_, root, nr_bits / BITS_PER_ULL) {
 			}
 
 			block_address get_root() const {
 				return array_.get_root();
+			}
+
+			unsigned get_nr_bits() const {
+				return nr_bits_;
 			}
 
 			void grow(unsigned new_nr_bits, bool default_value) {
@@ -184,7 +190,7 @@ namespace persistent_data {
 				if (n >= nr_bits_) {
 					std::ostringstream str;
 					str << "bitset index out of bounds ("
-					    << n << " >= " << nr_bits_ << endl;
+					    << n << " >= " << nr_bits_ << ")";
 					throw runtime_error(str.str());
 				}
 			}
@@ -198,54 +204,60 @@ namespace persistent_data {
 
 //----------------------------------------------------------------
 
-bitset::bitset(tm_ptr tm)
+persistent_data::bitset::bitset(tm_ptr tm)
 	: impl_(new bitset_impl(tm))
 {
 }
 
-bitset::bitset(tm_ptr tm, block_address root, unsigned nr_bits)
+persistent_data::bitset::bitset(tm_ptr tm, block_address root, unsigned nr_bits)
 	: impl_(new bitset_impl(tm, root, nr_bits))
 {
 }
 
 block_address
-bitset::get_root() const
+persistent_data::bitset::get_root() const
 {
 	return impl_->get_root();
 }
 
+unsigned
+persistent_data::bitset::get_nr_bits() const
+{
+	return impl_->get_nr_bits();
+}
+
 void
-bitset::grow(unsigned new_nr_bits, bool default_value)
+persistent_data::bitset::grow(unsigned new_nr_bits, bool default_value)
 {
 	impl_->grow(new_nr_bits, default_value);
 }
 
 void
-bitset::destroy()
+persistent_data::bitset::destroy()
 {
 	impl_->destroy();
 }
 
 bool
-bitset::get(unsigned n)
+persistent_data::bitset::get(unsigned n)
 {
 	return impl_->get(n);
 }
 
 void
-bitset::set(unsigned n, bool value)
+persistent_data::bitset::set(unsigned n, bool value)
 {
 	impl_->set(n, value);
 }
 
 void
-bitset::flush()
+persistent_data::bitset::flush()
 {
 	impl_->flush();
 }
 
 void
-bitset::walk_bitset(bitset_visitor &v) const
+persistent_data::bitset::walk_bitset(bitset_visitor &v) const
 {
 	impl_->walk_bitset(v);
 }

@@ -1,7 +1,7 @@
 #ifndef CACHE_SUPERBLOCK_H
 #define CACHE_SUPERBLOCK_H
 
-#include "persistent-data/endian_utils.h"
+#include "base/endian_utils.h"
 #include "persistent-data/data-structures/btree.h"
 
 #include <set>
@@ -30,6 +30,7 @@ namespace caching {
 		superblock_flags(uint32_t bits);
 
 		void set_flag(flag f);
+		void clear_flag(flag f);
 		bool get_flag(flag f) const;
 		uint32_t encode() const;
 		uint32_t get_unhandled_flags() const;
@@ -75,6 +76,10 @@ namespace caching {
 		uint32_t read_misses;
 		uint32_t write_hits;
 		uint32_t write_misses;
+	};
+
+	enum incompat_bits {
+		VARIABLE_HINT_SIZE_BIT = 0
 	};
 
 	//--------------------------------

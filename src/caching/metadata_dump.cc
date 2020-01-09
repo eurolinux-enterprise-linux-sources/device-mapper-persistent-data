@@ -15,7 +15,7 @@ namespace {
 
 	void raise_metadata_damage() {
 		throw std::runtime_error("metadata contains errors (run cache_check for details).\n"
-					 "perhaps you wanted to run with --repair");
+					 "perhaps you wanted to run with --repair ?");
 	}
 
 	//--------------------------------
@@ -122,7 +122,7 @@ caching::metadata_dump(metadata::ptr md, emitter::ptr e, bool repair)
 
 	// walk hints
 	e->begin_hints();
-	{
+	if (md->hints_) {
 		using namespace hint_array_damage;
 
 		hint_emitter he(e, valid_blocks);

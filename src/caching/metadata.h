@@ -1,10 +1,11 @@
 #ifndef CACHE_METADATA_H
 #define CACHE_METADATA_H
 
+#include "base/endian_utils.h"
+
 #include "persistent-data/block.h"
 #include "persistent-data/data-structures/array.h"
 #include "persistent-data/data-structures/bitset.h"
-#include "persistent-data/endian_utils.h"
 #include "persistent-data/space-maps/disk.h"
 #include "persistent-data/transaction_manager.h"
 
@@ -28,7 +29,7 @@ namespace caching {
 
 		metadata(block_manager<>::ptr bm, open_type ot);
 
-		void commit();
+		void commit(bool clean_shutdown = true);
 		void setup_hint_array(size_t width);
 
 
@@ -38,7 +39,7 @@ namespace caching {
 		checked_space_map::ptr metadata_sm_;
 		mapping_array::ptr mappings_;
 		hint_array::ptr hints_;
-		bitset::ptr discard_bits_;
+		persistent_data::bitset::ptr discard_bits_;
 
 	private:
 		void init_superblock();
@@ -50,7 +51,7 @@ namespace caching {
 		void commit_mappings();
 		void commit_hints();
 		void commit_discard_bits();
-		void commit_superblock();
+		void commit_superblock(bool clean_shutdown);
 	};
 };
 
