@@ -1,0 +1,55 @@
+--- thin-provisioning-tools-0.2.8/persistent-data/data-structures/bitset.cc.orig	2013-10-19 01:04:36.191286016 +0200
++++ thin-provisioning-tools-0.2.8/persistent-data/data-structures/bitset.cc	2013-10-19 01:05:44.533667977 +0200
+@@ -30,7 +30,7 @@
+ 		class bitset_impl {
+ 		public:
+ 			typedef boost::shared_ptr<bitset_impl> ptr;
+-			typedef typename persistent_data::transaction_manager::ptr tm_ptr;
++			typedef persistent_data::transaction_manager::ptr tm_ptr;
+ 
+ 			bitset_impl(tm_ptr tm)
+ 			: nr_bits_(0),
+--- thin-provisioning-tools-0.2.8/persistent-data/data-structures/bitset.h.orig	2013-10-19 01:04:36.239281380 +0200
++++ thin-provisioning-tools-0.2.8/persistent-data/data-structures/bitset.h	2013-10-19 01:05:44.559665454 +0200
+@@ -49,7 +49,7 @@
+ 	class bitset {
+ 	public:
+ 		typedef boost::shared_ptr<bitset> ptr;
+-		typedef typename persistent_data::transaction_manager::ptr tm_ptr;
++		typedef persistent_data::transaction_manager::ptr tm_ptr;
+ 
+ 		bitset(tm_ptr tm);
+ 		bitset(tm_ptr tm, block_address root, unsigned nr_bits);
+--- thin-provisioning-tools-0.2.8/caching/restore_emitter.cc.orig	2013-10-19 01:04:36.219283312 +0200
++++ thin-provisioning-tools-0.2.8/caching/restore_emitter.cc	2013-10-19 01:05:44.549666424 +0200
+@@ -58,7 +58,7 @@
+ 		virtual void mapping(pd::block_address cblock,
+ 				     pd::block_address oblock,
+ 				     bool dirty) {
+-			typename caching::mapping m;
++			caching::mapping m;
+ 			m.oblock_ = oblock;
+ 			m.flags_ = M_VALID;
+ 
+--- thin-provisioning-tools-0.2.8/caching/hint_array.cc.orig	2013-10-19 01:04:36.205284664 +0200
++++ thin-provisioning-tools-0.2.8/caching/hint_array.cc	2013-10-19 01:05:44.541667201 +0200
+@@ -239,7 +239,7 @@
+ {
+ }
+ 
+-hint_array::hint_array(typename hint_array::tm_ptr tm, unsigned width,
++hint_array::hint_array(hint_array::tm_ptr tm, unsigned width,
+ 		       block_address root, unsigned nr_entries)
+ 	: width_(check_width(width)),
+ 	  impl_(mk_array(tm, width, root, nr_entries))
+--- thin-provisioning-tools-0.2.8/caching/hint_array.h.orig	2013-10-19 01:04:36.251280221 +0200
++++ thin-provisioning-tools-0.2.8/caching/hint_array.h	2013-10-19 01:05:44.567664677 +0200
+@@ -56,7 +56,7 @@
+ 	class hint_array {
+ 	public:
+ 		typedef boost::shared_ptr<hint_array> ptr;
+-		typedef typename persistent_data::transaction_manager::ptr tm_ptr;
++		typedef persistent_data::transaction_manager::ptr tm_ptr;
+ 
+ 		hint_array(tm_ptr tm, unsigned width);
+ 		hint_array(tm_ptr tm, unsigned width, block_address root, unsigned nr_entries);
